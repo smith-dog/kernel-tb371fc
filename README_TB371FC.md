@@ -37,7 +37,7 @@ panel wake, suspend, KernelSU-as-LKM decoupling. Full patch history in
 > 前提：Bootloader 已解锁（`fastboot flashing unlock`）。
 
 1. 下载 [Release v1.0](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.0)
-   中的 `boot-v27n60-pure.img` 与 `KernelSU-v2patched-release.apk`
+   中的 [`boot-v27n60-pure.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.0/boot-v27n60-q706.img) 与 [`KernelSU-v2patched-release.apk`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.0/KernelSU-v2patched-release.apk)（也可直接用 [Release v1.1](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.1) 的 `kernelsu-patched-n61.img` 免修补直刷，已含 Docker 支持）
 2. 安装 APK，打开 KernelSU 管理器 → **安装** → **选择并修补一个文件** →
    选 `boot-v27n60-pure.img` → LKM 处选 **"使用本地 LKM 文件"** →
    选 `ksu-32630.ko` → 生成 `kernelsu_patched_*.img`
