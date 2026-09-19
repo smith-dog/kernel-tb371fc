@@ -87,6 +87,7 @@ LKM 注意：`CONFIG_KSU=m` 时 ksu.ko 需要本树 `drivers/ksu_sym.c`
 | 音频核心栈 | CodeLinaro `LA.UM.9.12.r1-18500-SMxx50.QSSI14.0`（techpack/audio） |
 | 相机 KMD | 同上 tag（techpack/camera） |
 | 视频硬解 | 小米 kona 树 msm_vidc（compatible 完全匹配） |
+| 触摸/背光驱动 | [tem423/android_kernel_lenovo_tb371fc](https://github.com/tem423/android_kernel_lenovo_tb371fc)（TB371FC 社区内核；本树合入其 nt36532 SPI 触摸驱动与 ktz8866a/b 双芯片背光驱动） |
 | KernelSU | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) @32630 |
 | 本项目 | p1~p130 补丁（见 `tb371fc/scripts/`），全部以上述来源为基础 |
 
