@@ -22,6 +22,7 @@ upgrades never require a kernel rebuild.
 - **外设**：指纹（供电轨修复）、WiFi/蓝牙、双扬声器唤醒
 - **系统兼容**：VINTF 兼容（消除开机"设备内部出现问题"弹窗）、睡眠（deep suspend）
 - **Root**：KernelSU 32630（backslashxx fork）以 LKM 运行，管理器一键修补升级
+- **Docker**：iptables 全套 + （docker0 网络初始化规则依赖）已齐
 
 **Fixes over stock**: speaker audio chain, camera video recording, fingerprint
 power rail, charge-protection feedback loop (36/s kernel vote storm → 0),
