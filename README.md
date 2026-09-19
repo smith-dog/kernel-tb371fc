@@ -88,7 +88,7 @@ LKM 注意：`CONFIG_KSU=m` 时 ksu.ko 需要本树 `drivers/ksu_sym.c`
 | 相机 KMD | 同上 tag（techpack/camera） |
 | 视频硬解 | 小米 kona 树 msm_vidc（compatible 完全匹配） |
 | 触摸/背光驱动 | [tem423/android_kernel_lenovo_tb371fc](https://github.com/tem423/android_kernel_lenovo_tb371fc)（TB371FC 社区内核；本树合入其 nt36532 SPI 触摸驱动与 ktz8866a/b 双芯片背光驱动） |
-| KernelSU | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) @32630 |
+| KernelSU | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) tag 32630（管理器 APK = 本项目 fork 构建：[smith-dog/KernelSU](https://github.com/smith-dog/KernelSU) 分支 allow-bootimage-v2，含 boot-v2 支持 + 依赖镜像修复） |
 | 本项目 | p1~p130 补丁（见 `tb371fc/scripts/`），全部以上述来源为基础 |
 
 联想未随 GPL dump 公开的部分（如 144Hz 显示驱动、部分面板参数）不在本树，
