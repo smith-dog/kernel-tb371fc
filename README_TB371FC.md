@@ -95,6 +95,12 @@ LKM 注意：`CONFIG_KSU=m` 时 ksu.ko 需要本树 `drivers/ksu_sym.c`
 联想未随 GPL dump 公开的部分（如 144Hz 显示驱动、部分面板参数）不在本树，
 对应功能保持原厂形态。
 
+## 📖 详细构建与 Root 流程
+
+见 [docs/NOTE-build-and-root.md](docs/NOTE-build-and-root.md)——含管理器修补
+分步操作、root 自举原理（为什么不能直刷纯净内核）、开机模块自动化部署、
+以及全部踩坑表。
+
 ## License
 
 GPL-2.0（继承内核及联想 GPL 发布）。
