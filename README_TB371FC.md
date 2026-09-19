@@ -83,7 +83,7 @@ LKM 注意：`CONFIG_KSU=m` 时 ksu.ko 需要本树 `drivers/ksu_sym.c`
 
 | 组成 | 来源 |
 |---|---|
-| 内核基线 | 联想官方 GPL 源码包（TB371FC，QSSI12 时代，4.19.157） |
+| 内核基线 | [lss4/android_kernel_lenovo_paladin](https://github.com/lss4/android_kernel_lenovo_paladin)（分支 11）——社区开发者整理开源的联想官方 GPL 包（TB-Q706F/Z，代号 paladin，4.19.157 与 TB371FC stock 同版本，含联想板级代码） |
 | 音频核心栈 | CodeLinaro `LA.UM.9.12.r1-18500-SMxx50.QSSI14.0`（techpack/audio） |
 | 相机 KMD | 同上 tag（techpack/camera） |
 | 视频硬解 | 小米 kona 树 msm_vidc（compatible 完全匹配） |
