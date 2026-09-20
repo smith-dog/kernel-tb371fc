@@ -23,6 +23,7 @@
 #include <linux/list.h>
 #include <linux/memblock.h>
 #include <linux/pstore_ram.h>
+#include <asm/cacheflush.h>
 #include <linux/rslib.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
@@ -276,6 +277,12 @@ static void notrace persistent_ram_update(struct persistent_ram_zone *prz,
 	struct persistent_ram_buffer *buffer = prz->buffer;
 	memcpy_toio(buffer->data + start, s, count);
 	persistent_ram_update_ecc(prz, start, count);
+	/* TB371FC p137: the ramoops region is mapped WB; without an
+	 * explicit clean the dirty lines are lost on the warm reset that
+	 * follows a panic/hard reset (panic() does not set oops_in_progress,
+	 * so this flush is unconditional - the cost is negligible). */
+	__flush_dcache_area(buffer->data + start, count);
+	__flush_dcache_area(buffer, sizeof(struct persistent_ram_buffer));
 }
 
 static int notrace persistent_ram_update_user(struct persistent_ram_zone *prz,
