@@ -140,4 +140,14 @@ kernel/configs/android-*.cfg
 arch/arm64/boot/dts/vendor/
 
 # Tech package directories
-techpack/
+# TB371FC: track the display driver files we modify (rest of techpack stays ignored)
+techpack/*
+!techpack/display
+techpack/display/*
+!techpack/display/msm
+techpack/display/msm/*
+!techpack/display/msm/dsi
+techpack/display/msm/dsi/*
+!techpack/display/msm/dsi/dsi_display.c
+!techpack/display/msm/dsi/dsi_panel.c
+!techpack/display/msm/dsi/dsi_ctrl.c
