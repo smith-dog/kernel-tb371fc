@@ -19,7 +19,8 @@ upgrades never require a kernel rebuild.
 - **音视频**：扬声器全链路（4×TFA9894 功放 + CLO 音频核心栈）、相机录像、
   venus 硬解码
 - **充电**：充电保护（40-60% 电量保持）、电池养护开关、充电状态自反馈死循环修复
-- **外设**：指纹（供电轨修复）、WiFi/蓝牙、双扬声器唤醒
+- **外设**：指纹（供电轨修复）、WiFi/蓝牙、双扬声器唤醒、双击亮屏
+  （DT2W：手势武装/退出时序重构 + 唤醒恢复改为面板上电前同步全量固件重刷）
 - **系统兼容**：VINTF 兼容（消除开机"设备内部出现问题"弹窗）、睡眠（deep suspend）
 - **Root**：KernelSU 32630（backslashxx fork）以 LKM 运行，管理器一键修补升级
 - **Docker**：iptables 全套 + xt_addrtype（docker0 网络初始化规则依赖）已齐
@@ -27,7 +28,8 @@ upgrades never require a kernel rebuild.
 **Fixes over stock**: speaker audio chain, camera video recording, fingerprint
 power rail, charge-protection feedback loop (36/s kernel vote storm → 0),
 boot-time "internal problem" dialog (VINTF kernel-version/config match),
-panel wake, suspend, KernelSU-as-LKM decoupling. Full patch history in
+panel wake, suspend, double-tap-to-wake, KernelSU-as-LKM decoupling.
+Full patch history in
 `tb371fc/scripts/` (p1–p130).
 
 ---
@@ -35,6 +37,23 @@ panel wake, suspend, KernelSU-as-LKM decoupling. Full patch history in
 ## 怎么用 / How to use
 
 > 前提：Bootloader 已解锁（`fastboot flashing unlock`）。
+
+1. 下载 [Release v1.3](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.3)
+   中的 [`boot-v27n86-patched-q706.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.3/boot-v27n86-patched-q706.img)（已含 root，直刷即可）与
+   [`tb371fc-dlkm-pkg-fixed.tar.gz`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.3/tb371fc-dlkm-pkg-fixed.tar.gz)（vendor 模块载荷包，内含一键安装说明）
+2. 刷入并重启：
+   ```
+   fastboot flash boot boot-v27n86-patched-q706.img
+   fastboot set_active a
+   fastboot reboot
+   ```
+3. 开机后 KernelSU 管理器显示"正常/LKM"即 root 就绪；按载荷包内 README
+   安装 vendor 模块（WiFi/音频等）
+
+**日后升级 KernelSU**：只替换 `/data/adb/tb371fc-dlkm/ksu.ko` 并重启，**内核无需重刷**。
+
+<details>
+<summary>旧方法（v1.0/v1.1 纯净镜像 + 管理器修补）</summary>
 
 1. 下载 [Release v1.0](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.0)
    中的 [`boot-v27n60-pure.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.0/boot-v27n60-q706.img) 与 [`KernelSU-v2patched-release.apk`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.0/KernelSU-v2patched-release.apk)（也可直接用 [Release v1.1](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.1) 的 `kernelsu-patched-n61.img` 免修补直刷，已含 Docker 支持）
@@ -47,11 +66,8 @@ panel wake, suspend, KernelSU-as-LKM decoupling. Full patch history in
    fastboot set_active a
    fastboot reboot
    ```
-4. 开机后管理器显示"正常/LKM"即成功；vendor 模块（WiFi/音频等）
-   需要 [tb371fc-dlkm-pkg.tar.gz](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.0)
-   载荷包（内含 README 一键安装说明）
 
-**日后升级 KernelSU**：只换新版 `ksu.ko` 重复第 2 步，**内核无需重编**。
+</details>
 
 ---
 
@@ -78,6 +94,10 @@ python3 tb371fc/tools/repack_boot.py <apatch_base.img> \
 LKM 注意：`CONFIG_KSU=m` 时 ksu.ko 需要本树 `drivers/ksu_sym.c`
 （48 个非公开符号的 EXPORT 垫片，已内建在树中）。
 
+techpack 说明：本库仅跟踪 `techpack/display`（显示栈）；`techpack` 下的
+audio/camera/video 源码不入库（音频由 dlkm 模块包提供，构建时 Kbuild
+会自动跳过不存在的目录，不影响编译）。
+
 ---
 
 ## 源代码来自哪里 / Provenance
@@ -90,7 +110,7 @@ LKM 注意：`CONFIG_KSU=m` 时 ksu.ko 需要本树 `drivers/ksu_sym.c`
 | 视频硬解 | 小米 kona 树 msm_vidc（compatible 完全匹配） |
 | 触摸/背光驱动 | [tem423/android_kernel_lenovo_tb371fc](https://github.com/tem423/android_kernel_lenovo_tb371fc)（TB371FC 社区内核；本树合入其 nt36532 SPI 触摸驱动与 ktz8866a/b 双芯片背光驱动） |
 | KernelSU | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) tag 32630（管理器 APK = 本项目 fork 构建：[smith-dog/KernelSU](https://github.com/smith-dog/KernelSU) 分支 allow-bootimage-v2，含 boot-v2 支持 + 依赖镜像修复） |
-| 本项目 | p1~p130 补丁（见 `tb371fc/scripts/`），全部以上述来源为基础 |
+| 本项目 | p1~p177 补丁（见 `tb371fc/scripts/`），全部以上述来源为基础 |
 
 联想未随 GPL dump 公开的部分（如 144Hz 显示驱动、部分面板参数）不在本树，
 对应功能保持原厂形态。
