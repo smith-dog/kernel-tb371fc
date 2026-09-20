@@ -1,0 +1,4 @@
+#!/system/bin/sh
+# 98-dlkm — TB371FC 自编内核模块加载钩子（薄启动器）
+# 载荷在 /data/adb/tb371fc-dlkm/，见其 README.md
+/data/adb/tb371fc-dlkm/load.sh &
