@@ -44,8 +44,8 @@ Full patch history in
 2. 刷入并重启：
    ```
    fastboot flash boot boot-v27n86-patched-q706.img
-   fastboot set_active a
    fastboot reboot
+   > 说明：`fastboot flash boot` 刷入的是**当前活动槽**；不确定可先 `fastboot getvar current-slot` 查看。刷完切勿 `set_active` 切到另一槽——那会启动旧内核。
    ```
 3. 开机后 KernelSU 管理器显示"正常/LKM"即 root 就绪；按载荷包内 README
    安装 vendor 模块（WiFi/音频等）
@@ -63,7 +63,6 @@ Full patch history in
 3. 刷入并重启：
    ```
    fastboot flash boot kernelsu_patched_*.img
-   fastboot set_active a
    fastboot reboot
    ```
 
