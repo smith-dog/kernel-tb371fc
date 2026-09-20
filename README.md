@@ -74,6 +74,8 @@ Full patch history in
 环境：WSL2 Ubuntu + [Snapdragon LLVM 10.0.7 for Android NDK]
 （与联想原厂编译横幅一致）+ aarch64-linux-gnu binutils ≥ 2.46。
 
+内核配置：`cp tb371fc/config-n86.txt .config`（出货 v1.3 内核同款）。
+
 ```bash
 export PATH=/path/to/snapdragon-llvm-10.0.7/bin:$PATH
 # 内核镜像
