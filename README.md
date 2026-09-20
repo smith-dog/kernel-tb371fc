@@ -90,12 +90,12 @@ python3 tb371fc/tools/repack_boot.py <apatch_base.img> \
 ```
 
 LKM 注意：`CONFIG_KSU=m` 时 ksu.ko 需要本树 `drivers/ksu_sym.c`
-（48 个非公开符号的 EXPORT 垫片，已内建在树中）。
+（48 个非公开符号的 EXPORT 垫片，已内建在树中）。`tb371fc/tools/` 内含
+repack/insmod128/dtbo 等工具与源码（[tools 目录](https://github.com/smith-dog/kernel-tb371fc/tree/main/tb371fc/tools)）。
 
-techpack 说明：本库跟踪 `techpack/display` 与 `techpack/Kbuild`、
-`techpack/stub` 胶水；techpack 下的 audio/camera/video 源码未入库且未在
-内核配置中启用（音频 .ko 由 dlkm 模块包提供），克隆缺失这些目录不影响
-编译与产物功能。
+techpack 说明：display/audio/camera/video 四个驱动目录的源码已全部入库
+（与出货内核一致，相机 KMD 内建、音频编为 dlkm 模块），仅构建产物
+（*.o/*.a/*.cmd 等）被忽略。
 
 ---
 
@@ -104,12 +104,13 @@ techpack 说明：本库跟踪 `techpack/display` 与 `techpack/Kbuild`、
 | 组成 | 来源 |
 |---|---|
 | 内核基线 | [lss4/android_kernel_lenovo_paladin](https://github.com/lss4/android_kernel_lenovo_paladin)（分支 11）——社区开发者整理开源的联想官方 GPL 包（TB-Q706F/Z，代号 paladin，4.19.157 与 TB371FC stock 同版本，含联想板级代码） |
-| 音频核心栈 | CodeLinaro `LA.UM.9.12.r1-18500-SMxx50.QSSI14.0`（techpack/audio） |
-| 相机 KMD | 同上 tag（techpack/camera） |
-| 视频硬解 | 小米 kona 树 msm_vidc（compatible 完全匹配） |
+| 显示栈 | CodeLinaro [msm-4.19 @ LA.UM.9.12.r1-18500-SMxx50.QSSI14.0](https://git.codelinaro.org/clo/la/kernel/msm-4.19/-/tree/LA.UM.9.12.r1-18500-SMxx50.QSSI14.0)（vanilla techpack/display；双击唤醒通知钩子 p140/p174 位于 dsi_display.c） |
+| 音频核心栈 | 同上 CLO tag 的 [techpack/audio](https://git.codelinaro.org/clo/la/kernel/msm-4.19/-/tree/LA.UM.9.12.r1-18500-SMxx50.QSSI14.0/techpack/audio)（编出 dlkm 音频模块，见模块包） |
+| 相机 KMD | 同上 CLO tag 的 [techpack/camera](https://git.codelinaro.org/clo/la/kernel/msm-4.19/-/tree/LA.UM.9.12.r1-18500-SMxx50.QSSI14.0/techpack/camera)（SPECTRA_CAMERA=y，内建） |
+| 视频硬解 | [MiCode/Xiaomi_Kernel_OpenSource](https://github.com/MiCode/Xiaomi_Kernel_OpenSource) kona 分支的 msm_vidc（compatible 完全匹配） |
 | 触摸/背光驱动 | [tem423/android_kernel_lenovo_tb371fc](https://github.com/tem423/android_kernel_lenovo_tb371fc)（TB371FC 社区内核；本树合入其 nt36532 SPI 触摸驱动与 ktz8866a/b 双芯片背光驱动） |
 | KernelSU | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) tag 32630（管理器 APK = 本项目 fork 构建：[smith-dog/KernelSU](https://github.com/smith-dog/KernelSU) 分支 allow-bootimage-v2，含 boot-v2 支持 + 依赖镜像修复） |
-| 本项目 | p1~p177 补丁（见 `tb371fc/scripts/`），全部以上述来源为基础 |
+| 本项目 | p1~p177 补丁（[tb371fc/scripts](https://github.com/smith-dog/kernel-tb371fc/tree/main/tb371fc/scripts)），全部以上述来源为基础 |
 
 联想未随 GPL dump 公开的部分（如 144Hz 显示驱动、部分面板参数）不在本树，
 对应功能保持原厂形态。
