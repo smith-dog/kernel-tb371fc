@@ -140,14 +140,13 @@ kernel/configs/android-*.cfg
 arch/arm64/boot/dts/vendor/
 
 # Tech package directories
-# TB371FC: track the display driver files we modify (rest of techpack stays ignored)
+# TB371FC: track the display driver we modify (+ stub/Kbuild glue); the
+# rest of techpack (audio/camera/video, 170MB+) stays outside git - audio
+# ships as dlkm modules instead.
 techpack/*
+!techpack/Kbuild
 !techpack/display
-techpack/display/*
-!techpack/display/msm
-techpack/display/msm/*
-!techpack/display/msm/dsi
-techpack/display/msm/dsi/*
-!techpack/display/msm/dsi/dsi_display.c
-!techpack/display/msm/dsi/dsi_panel.c
-!techpack/display/msm/dsi/dsi_ctrl.c
+!techpack/stub
+*.cmd
+*.d
+modules.builtin
