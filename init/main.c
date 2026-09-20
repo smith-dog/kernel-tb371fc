@@ -556,7 +556,6 @@ static void __init mm_init(void)
 	pti_init();
 }
 
-void tb_bb_copy(void);
 asmlinkage __visible void __init start_kernel(void)
 {
 	char *command_line;
@@ -579,7 +578,6 @@ asmlinkage __visible void __init start_kernel(void)
 	page_address_init();
 	pr_notice("%s", linux_banner);
 	setup_arch(&command_line);
-	tb_bb_copy();
 	mm_init_cpumask(&init_mm);
 	setup_command_line(command_line);
 	setup_nr_cpu_ids();
@@ -695,7 +693,6 @@ asmlinkage __visible void __init start_kernel(void)
 	 * this. But we do want output early, in case something goes wrong.
 	 */
 	console_init();
-	tb_bb_copy();
 	if (panic_later)
 		panic("Too many boot %s vars at `%s'", panic_later,
 		      panic_param);
@@ -772,7 +769,6 @@ asmlinkage __visible void __init start_kernel(void)
 	}
 
 	/* Do the rest non-__init'ed, we're now alive */
-	tb_bb_copy();
 	rest_init();
 
 	prevent_tail_call_optimization();

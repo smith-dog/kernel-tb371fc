@@ -296,7 +296,6 @@ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
 
 void __init __weak init_random_pool(void) { }
 
-extern void tb_bb_mark(char c); /* TB371FC_BB24 */
 void __init setup_arch(char **cmdline_p)
 {
 	init_mm.start_code = (unsigned long) _text;
@@ -307,11 +306,9 @@ void __init setup_arch(char **cmdline_p)
 	*cmdline_p = boot_command_line;
 
 	early_fixmap_init();
-	tb_bb_mark('F');
 	early_ioremap_init();
 
 	setup_machine_fdt(__fdt_pointer);
-	tb_bb_mark('M');
 
 	/*
 	 * Initialise the static keys early as they may be enabled by the
@@ -319,7 +316,6 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	jump_label_init();
 	parse_early_param();
-	tb_bb_mark('P');
 
 	/*
 	 * Unmask asynchronous aborts and fiq after bringing up possible
@@ -337,10 +333,8 @@ void __init setup_arch(char **cmdline_p)
 	xen_early_init();
 	efi_init();
 	arm64_memblock_init();
-	tb_bb_mark('B');
 
 	paging_init();
-	tb_bb_mark('G');
 
 	acpi_table_upgrade();
 
