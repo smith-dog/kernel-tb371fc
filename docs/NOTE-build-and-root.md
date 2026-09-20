@@ -104,7 +104,6 @@ python3 tb371fc/tools/repack_boot.py <apatch_base.img> \
    adb reboot bootloader
    fastboot flash boot kernelsu_patched_*.img
    fastboot reboot
-   >  说明：`fastboot flash boot` 刷入的是**当前活动槽**；不确定可先 `fastboot getvar current-slot` 查看。刷完切勿 `set_active` 切到另一槽——那会启动旧内核。
    ```
 6. 开机后验证：管理器显示 **LKM + 正常**；`adb shell su -c id` 返回
    `uid=0(root) ... context=u:r:ksu:s0`

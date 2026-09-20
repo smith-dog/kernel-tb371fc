@@ -45,7 +45,6 @@ Full patch history in
    ```
    fastboot flash boot boot-v27n86-patched-q706.img
    fastboot reboot
-   > 说明：`fastboot flash boot` 刷入的是**当前活动槽**；不确定可先 `fastboot getvar current-slot` 查看。刷完切勿 `set_active` 切到另一槽——那会启动旧内核。
    ```
 3. 开机后 KernelSU 管理器显示"正常/LKM"即 root 就绪；按载荷包内 README
    安装 vendor 模块（WiFi/音频等）
@@ -93,9 +92,10 @@ python3 tb371fc/tools/repack_boot.py <apatch_base.img> \
 LKM 注意：`CONFIG_KSU=m` 时 ksu.ko 需要本树 `drivers/ksu_sym.c`
 （48 个非公开符号的 EXPORT 垫片，已内建在树中）。
 
-techpack 说明：本库仅跟踪 `techpack/display`（显示栈）；`techpack` 下的
-audio/camera/video 源码不入库（音频由 dlkm 模块包提供，构建时 Kbuild
-会自动跳过不存在的目录，不影响编译）。
+techpack 说明：本库跟踪 `techpack/display` 与 `techpack/Kbuild`、
+`techpack/stub` 胶水；techpack 下的 audio/camera/video 源码未入库且未在
+内核配置中启用（音频 .ko 由 dlkm 模块包提供），克隆缺失这些目录不影响
+编译与产物功能。
 
 ---
 
