@@ -23,6 +23,7 @@
 extern void free_uid(struct user_struct *);
 extern struct user_struct *alloc_uid(kuid_t);
 extern long __arm64_sys_umount(const struct pt_regs *);
+extern long __arm64_sys_close(const struct pt_regs *);
 extern long __arm64_sys_execve(const struct pt_regs *);
 extern long __arm64_sys_execveat(const struct pt_regs *);
 extern long __arm64_compat_sys_execve(const struct pt_regs *);
@@ -77,6 +78,7 @@ EXPORT_SYMBOL_GPL(__arm64_sys_read);
 EXPORT_SYMBOL_GPL(__arm64_sys_reboot);
 EXPORT_SYMBOL_GPL(__arm64_sys_setns);
 EXPORT_SYMBOL_GPL(__arm64_sys_umount);
+EXPORT_SYMBOL_GPL(__arm64_sys_close);
 EXPORT_SYMBOL_GPL(_etext);
 EXPORT_SYMBOL_GPL(_stext);
 EXPORT_SYMBOL_GPL(aarch64_get_branch_offset);
