@@ -146,3 +146,7 @@ arch/arm64/boot/dts/vendor/
 *.cmd
 *.d
 modules.builtin
+
+# Python bytecode (tb371fc helper scripts)
+__pycache__/
+*.pyc
