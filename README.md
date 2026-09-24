@@ -55,25 +55,13 @@ Full patch history in
 **日后升级 KernelSU**：只替换 `/data/adb/tb371fc-dlkm/ksu.ko` 并重启，**内核无需重刷**。
 
 <details>
-<summary>管理器修补路线 / 历史版本包（v1.4 纯净镜像、v1.3、v1.0/v1.1）</summary>
+<summary>旧方法（v1.4 纯净镜像 + 管理器修补）</summary>
 
-**v1.4 自行修补**：下载 [Release v1.4](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.4)
-的 [`boot-v27n89-pure-q706.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.4/boot-v27n89-pure-q706.img)、
-[`ksu-v27n89.ko`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.4/ksu-v27n89.ko)
-与管理器 [`KernelSU_32630c-98-g1099b137_32735-release.apk`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.4/KernelSU_32630c-98-g1099b137_32735-release.apk)
-→ 安装 APK → **安装** → **选择并修补一个文件** → 选纯镜像 → LKM 处选
-**"使用本地 LKM 文件"** → 选 `ksu-v27n89.ko` → 刷生成物。
-
-**v1.3（n86，无 OTG 修复）**：[Release v1.3](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.3)
-[`boot-v27n86-patched-q706.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.3/boot-v27n86-patched-q706.img)（免修补直刷）+ 同页载荷包。
-
-**v1.0/v1.1（n60/n61，历史存档）**：
-
-1. 下载 [Release v1.0](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.0)
-   中的 [`boot-v27n60-pure.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.0/boot-v27n60-q706.img) 与 [`KernelSU-v2patched-release.apk`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.0/KernelSU-v2patched-release.apk)（也可直接用 [Release v1.1](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.1) 的 `kernelsu-patched-n61.img` 免修补直刷，已含 Docker 支持）
+1. 下载 [Release v1.4](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.4)
+   中的 [`boot-v27n89-pure-q706.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.4/boot-v27n89-pure-q706.img) 与 [`KernelSU_32630c-98-g1099b137_32735-release.apk`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.4/KernelSU_32630c-98-g1099b137_32735-release.apk)（也可直接用同 Release 的 `kernelsu_patched_20260924_084550.img` 免修补直刷）
 2. 安装 APK，打开 KernelSU 管理器 → **安装** → **选择并修补一个文件** →
-   选 `boot-v27n60-pure.img` → LKM 处选 **"使用本地 LKM 文件"** →
-   选 `ksu-32630.ko` → 生成 `kernelsu_patched_*.img`
+   选 `boot-v27n89-pure-q706.img` → LKM 处选 **"使用本地 LKM 文件"** →
+   选 `ksu-v27n89.ko` → 生成 `kernelsu_patched_*.img`
 3. 刷入并重启：
    ```
    fastboot flash boot kernelsu_patched_*.img
