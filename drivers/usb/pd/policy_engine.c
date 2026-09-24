@@ -559,9 +559,7 @@ static inline void start_usb_host(struct usbpd *pd, bool ss)
 	union extcon_property_value val;
 	int ret = 0;
 
-	if (0 != otg_state)
-		return;
-
+	/* TB371FC: drop Lenovo's otg_state gate so sink attach auto-hosts */
 	val.intval = (cc == ORIENTATION_CC2);
 	extcon_set_property(pd->extcon, EXTCON_USB_HOST,
 			EXTCON_PROP_USB_TYPEC_POLARITY, val);
