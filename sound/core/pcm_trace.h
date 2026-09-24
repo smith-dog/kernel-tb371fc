@@ -145,5 +145,5 @@ TRACE_EVENT(applptr,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/sound/core
+#define TRACE_INCLUDE_PATH ../../sound/core
 #include <trace/define_trace.h>

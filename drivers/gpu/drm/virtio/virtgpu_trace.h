@@ -48,5 +48,5 @@ DEFINE_EVENT(virtio_gpu_cmd, virtio_gpu_cmd_response,
 #endif
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/gpu/drm/virtio
+#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/virtio
 #include <trace/define_trace.h>

@@ -738,6 +738,6 @@ TRACE_EVENT(xrep_ialloc_insert,
 #endif /* _TRACE_XFS_SCRUB_TRACE_H */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/.
+#define TRACE_INCLUDE_PATH ../../.
 #define TRACE_INCLUDE_FILE scrub/trace
 #include <trace/define_trace.h>

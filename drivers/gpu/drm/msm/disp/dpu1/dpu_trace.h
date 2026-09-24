@@ -1003,5 +1003,5 @@ TRACE_EVENT(dpu_core_perf_update_clk,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/gpu/drm/msm/disp/dpu1
+#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/msm/disp/dpu1
 #include <trace/define_trace.h>

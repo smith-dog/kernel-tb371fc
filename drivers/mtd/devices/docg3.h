@@ -363,6 +363,6 @@ TRACE_EVENT(docg3_io,
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
 #undef TRACE_INCLUDE_FILE
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/mtd/devices
+#define TRACE_INCLUDE_PATH ../../drivers/mtd/devices
 #define TRACE_INCLUDE_FILE docg3
 #include <trace/define_trace.h>

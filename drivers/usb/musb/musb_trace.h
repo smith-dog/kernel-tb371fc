@@ -355,7 +355,7 @@ DEFINE_EVENT(musb_cppi41, musb_cppi41_free,
 /* this part has to be here */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/usb/musb
+#define TRACE_INCLUDE_PATH ../../drivers/usb/musb
 
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE musb_trace

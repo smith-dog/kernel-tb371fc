@@ -35,7 +35,7 @@ TRACE_EVENT_FN(benchmark_event,
 
 #undef TRACE_INCLUDE_FILE
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/kernel/trace
+#define TRACE_INCLUDE_PATH ../../kernel/trace
 #define TRACE_INCLUDE_FILE trace_benchmark
 
 /* This part must be outside protection */

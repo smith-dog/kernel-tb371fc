@@ -5,7 +5,7 @@
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM rmnet
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/net/ethernet/qualcomm/rmnet
+#define TRACE_INCLUDE_PATH ../../drivers/net/ethernet/qualcomm/rmnet
 #define TRACE_INCLUDE_FILE rmnet_trace
 
 #if !defined(_TRACE_RMNET_H) || defined(TRACE_HEADER_MULTI_READ)

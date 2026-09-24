@@ -203,7 +203,7 @@ DEFINE_EVENT(
  * module.
  */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/net/ethernet/intel/i40evf
+#define TRACE_INCLUDE_PATH ../../drivers/net/ethernet/intel/i40evf
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE i40e_trace
 #include <trace/define_trace.h>

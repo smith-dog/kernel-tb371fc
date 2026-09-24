@@ -3334,7 +3334,7 @@ TRACE_EVENT(cfg80211_update_owe_info_event,
 #endif /* !__RDEV_OPS_TRACE || TRACE_HEADER_MULTI_READ */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/net/wireless
+#define TRACE_INCLUDE_PATH ../../net/wireless
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace
 #include <trace/define_trace.h>

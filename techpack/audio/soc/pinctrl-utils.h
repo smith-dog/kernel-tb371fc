@@ -1,1 +1,1 @@
-/home/smith/android_kernel_lenovo_paladin/drivers/pinctrl/pinctrl-utils.h
+/home/smith/kernels/tb371fc/android_kernel_lenovo_tb371fc/drivers/pinctrl/pinctrl-utils.h

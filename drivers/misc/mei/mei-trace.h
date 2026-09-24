@@ -88,6 +88,6 @@ TRACE_EVENT(mei_pci_cfg_read,
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
 #undef TRACE_INCLUDE_FILE
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/misc/mei
+#define TRACE_INCLUDE_PATH ../../drivers/misc/mei
 #define TRACE_INCLUDE_FILE mei-trace
 #include <trace/define_trace.h>

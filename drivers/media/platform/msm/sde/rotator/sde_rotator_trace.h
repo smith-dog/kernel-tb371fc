@@ -8,7 +8,7 @@
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM sde_rotator
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/media/platform/msm/sde/rotator
+#define TRACE_INCLUDE_PATH ../../drivers/media/platform/msm/sde/rotator
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE sde_rotator_trace
 

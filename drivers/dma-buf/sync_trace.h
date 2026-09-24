@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #undef TRACE_SYSTEM
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/dma-buf
+#define TRACE_INCLUDE_PATH ../../drivers/dma-buf
 #define TRACE_SYSTEM sync_trace
 
 #if !defined(_TRACE_SYNC_H) || defined(TRACE_HEADER_MULTI_READ)

@@ -124,7 +124,7 @@ TRACE_EVENT(atl_sync_rx_range,
 #endif /* _ATL_TRACE_H */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/net/ethernet/aquantia/atlantic-fwd
+#define TRACE_INCLUDE_PATH ../../drivers/net/ethernet/aquantia/atlantic-fwd
 #undef  TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE atl_trace
 #include <trace/define_trace.h>

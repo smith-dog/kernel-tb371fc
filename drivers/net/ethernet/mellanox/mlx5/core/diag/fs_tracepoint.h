@@ -280,7 +280,7 @@ TRACE_EVENT(mlx5_fs_del_rule,
 #endif
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/net/ethernet/mellanox/mlx5/core/diag/diag
+#define TRACE_INCLUDE_PATH ../../drivers/net/ethernet/mellanox/mlx5/core/diag/diag
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE fs_tracepoint
 #include <trace/define_trace.h>

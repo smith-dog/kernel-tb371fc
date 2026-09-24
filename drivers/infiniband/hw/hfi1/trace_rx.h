@@ -264,6 +264,6 @@ TRACE_EVENT(hfi1_mmu_invalidate,
 
 #undef TRACE_INCLUDE_PATH
 #undef TRACE_INCLUDE_FILE
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/infiniband/hw/hfi1
+#define TRACE_INCLUDE_PATH ../../drivers/infiniband/hw/hfi1
 #define TRACE_INCLUDE_FILE trace_rx
 #include <trace/define_trace.h>

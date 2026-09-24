@@ -291,7 +291,7 @@ TRACE_EVENT(wil6210_tx_status,
 #if defined(CONFIG_WIL6210_TRACING) && !defined(__CHECKER__)
 /* we don't want to use include/trace/events */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/net/wireless/ath/wil6210
+#define TRACE_INCLUDE_PATH ../../drivers/net/wireless/ath/wil6210
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace
 

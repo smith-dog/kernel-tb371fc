@@ -178,5 +178,5 @@ TRACE_EVENT(nvsp_recv,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/net/hyperv
+#define TRACE_INCLUDE_PATH ../../drivers/net/hyperv
 #include <trace/define_trace.h>

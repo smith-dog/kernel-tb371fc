@@ -481,6 +481,6 @@ DEFINE_EVENT(hfi1_output_ibhdr_template, sdma_output_ibhdr,
 
 #undef TRACE_INCLUDE_PATH
 #undef TRACE_INCLUDE_FILE
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/infiniband/hw/hfi1
+#define TRACE_INCLUDE_PATH ../../drivers/infiniband/hw/hfi1
 #define TRACE_INCLUDE_FILE trace_ibhdrs
 #include <trace/define_trace.h>

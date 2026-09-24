@@ -50,5 +50,5 @@ DEFINE_EVENT(hda_pm, azx_runtime_resume,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/sound/pci/hda
+#define TRACE_INCLUDE_PATH ../../sound/pci/hda
 #include <trace/define_trace.h>

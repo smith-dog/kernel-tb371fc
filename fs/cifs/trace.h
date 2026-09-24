@@ -489,6 +489,6 @@ DEFINE_SMB3_RECONNECT_EVENT(partial_send_reconnect);
 #endif /* _CIFS_TRACE_H */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/.
+#define TRACE_INCLUDE_PATH ../../.
 #define TRACE_INCLUDE_FILE trace
 #include <trace/define_trace.h>

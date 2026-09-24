@@ -267,7 +267,7 @@ TRACE_EVENT(802154_drv_set_promiscuous_mode,
 #endif /* !__MAC802154_DRIVER_TRACE || TRACE_HEADER_MULTI_READ */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/net/mac802154
+#define TRACE_INCLUDE_PATH ../../net/mac802154
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace
 #include <trace/define_trace.h>

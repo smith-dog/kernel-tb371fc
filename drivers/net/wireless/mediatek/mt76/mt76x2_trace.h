@@ -137,7 +137,7 @@ TRACE_EVENT(dev_irq,
 #endif
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/net/wireless/mediatek/mt76
+#define TRACE_INCLUDE_PATH ../../drivers/net/wireless/mediatek/mt76
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE mt76x2_trace
 

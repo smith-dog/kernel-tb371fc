@@ -144,6 +144,6 @@ TRACE_EVENT(hfi1_fault_packet,
 
 #undef TRACE_INCLUDE_PATH
 #undef TRACE_INCLUDE_FILE
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/infiniband/hw/hfi1
+#define TRACE_INCLUDE_PATH ../../drivers/infiniband/hw/hfi1
 #define TRACE_INCLUDE_FILE trace_misc
 #include <trace/define_trace.h>

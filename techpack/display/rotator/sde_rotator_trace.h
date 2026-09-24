@@ -8,7 +8,7 @@
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM sde_rotator
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/techpack/display/rotator
+#define TRACE_INCLUDE_PATH ../../techpack/display/rotator
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE sde_rotator_trace
 

@@ -159,7 +159,7 @@ TRACE_EVENT(nvme_complete_rq,
 #endif /* _TRACE_NVME_H */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/nvme/host
+#define TRACE_INCLUDE_PATH ../../drivers/nvme/host
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace
 

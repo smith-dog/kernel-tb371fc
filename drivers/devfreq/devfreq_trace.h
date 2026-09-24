@@ -9,7 +9,7 @@
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM devfreq
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/devfreq
+#define TRACE_INCLUDE_PATH ../../drivers/devfreq
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE devfreq_trace
 

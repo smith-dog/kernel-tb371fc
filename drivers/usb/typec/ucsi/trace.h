@@ -136,7 +136,7 @@ DEFINE_EVENT(ucsi_log_connector_status, ucsi_register_port,
 /* This part must be outside protection */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/usb/typec/ucsi
+#define TRACE_INCLUDE_PATH ../../drivers/usb/typec/ucsi
 
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace

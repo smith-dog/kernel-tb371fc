@@ -281,7 +281,7 @@ DEFINE_EVENT(udc_log_req, usb_gadget_giveback_request,
 /* this part has to be here */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/usb/gadget/udc
+#define TRACE_INCLUDE_PATH ../../drivers/usb/gadget/udc
 
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace

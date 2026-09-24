@@ -51,7 +51,7 @@ DEFINE_EVENT(mac80211_msg_event, mac80211_err,
 #endif /* !__MAC80211_MSG_DRIVER_TRACE || TRACE_HEADER_MULTI_READ */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/net/mac80211
+#define TRACE_INCLUDE_PATH ../../net/mac80211
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace_msg
 #include <trace/define_trace.h>

@@ -155,7 +155,7 @@ DEFINE_EVENT(coda_buf_meta_class, coda_dec_rot_done,
 #endif /* __CODA_TRACE_H__ */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/media/platform/coda
+#define TRACE_INCLUDE_PATH ../../drivers/media/platform/coda
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace
 

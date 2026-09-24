@@ -98,6 +98,6 @@ TRACE_EVENT(sched_switch_with_ctrs,
 
 #endif
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/arch/arm64/kernel
+#define TRACE_INCLUDE_PATH ../../arch/arm64/kernel
 #define TRACE_INCLUDE_FILE perf_trace_counters
 #include <trace/define_trace.h>

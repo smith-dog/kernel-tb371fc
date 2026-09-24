@@ -467,5 +467,5 @@ TRACE_EVENT(amdgpu_bo_move,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/gpu/drm/amd/amdgpu
+#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/amd/amdgpu
 #include <trace/define_trace.h>

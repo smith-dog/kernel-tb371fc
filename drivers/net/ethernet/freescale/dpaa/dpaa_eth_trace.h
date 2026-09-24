@@ -135,7 +135,7 @@ DEFINE_EVENT(dpaa_eth_fd, dpaa_tx_conf_fd,
 
 /* This must be outside ifdef _DPAA_ETH_TRACE_H */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/net/ethernet/freescale/dpaa
+#define TRACE_INCLUDE_PATH ../../drivers/net/ethernet/freescale/dpaa
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE	dpaa_eth_trace
 #include <trace/define_trace.h>

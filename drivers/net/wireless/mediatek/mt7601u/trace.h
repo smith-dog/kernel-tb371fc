@@ -393,7 +393,7 @@ TRACE_EVENT(set_shared_key,
 #endif
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/net/wireless/mediatek/mt7601u
+#define TRACE_INCLUDE_PATH ../../drivers/net/wireless/mediatek/mt7601u
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace
 

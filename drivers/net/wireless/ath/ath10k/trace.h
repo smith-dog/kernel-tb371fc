@@ -536,7 +536,7 @@ TRACE_EVENT(ath10k_wmi_diag,
 
 /* we don't want to use include/trace/events */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/net/wireless/ath/ath10k
+#define TRACE_INCLUDE_PATH ../../drivers/net/wireless/ath/ath10k
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace
 

@@ -78,7 +78,7 @@ TRACE_EVENT(dccp_probe,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/net/dccp
+#define TRACE_INCLUDE_PATH ../../net/dccp
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace
 #include <trace/define_trace.h>

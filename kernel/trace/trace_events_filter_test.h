@@ -44,7 +44,7 @@ TRACE_EVENT(ftrace_test_filter,
 
 #undef TRACE_INCLUDE_PATH
 #undef TRACE_INCLUDE_FILE
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/kernel/trace
+#define TRACE_INCLUDE_PATH ../../kernel/trace
 #define TRACE_INCLUDE_FILE trace_events_filter_test
 
 /* This part must be outside protection */

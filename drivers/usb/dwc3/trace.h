@@ -335,7 +335,7 @@ DEFINE_EVENT(dwc3_log_ep, dwc3_gadget_ep_disable,
 /* this part has to be here */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/usb/dwc3
+#define TRACE_INCLUDE_PATH ../../drivers/usb/dwc3
 
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace

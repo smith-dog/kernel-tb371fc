@@ -690,6 +690,6 @@ TRACE_EVENT(cxl_hcall_download_facility,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/misc/cxl
+#define TRACE_INCLUDE_PATH ../../drivers/misc/cxl
 #define TRACE_INCLUDE_FILE trace
 #include <trace/define_trace.h>

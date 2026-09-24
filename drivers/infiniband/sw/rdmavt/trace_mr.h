@@ -169,6 +169,6 @@ DEFINE_EVENT(
 
 #undef TRACE_INCLUDE_PATH
 #undef TRACE_INCLUDE_FILE
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/infiniband/sw/rdmavt
+#define TRACE_INCLUDE_PATH ../../drivers/infiniband/sw/rdmavt
 #define TRACE_INCLUDE_FILE trace_mr
 #include <trace/define_trace.h>

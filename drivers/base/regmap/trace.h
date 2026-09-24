@@ -249,7 +249,7 @@ TRACE_EVENT(regcache_drop_region,
 #endif /* _TRACE_REGMAP_H */
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/base/regmap
+#define TRACE_INCLUDE_PATH ../../drivers/base/regmap
 
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace

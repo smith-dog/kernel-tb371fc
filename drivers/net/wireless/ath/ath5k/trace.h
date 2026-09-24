@@ -98,7 +98,7 @@ TRACE_EVENT(ath5k_tx_complete,
 #if defined(CONFIG_ATH5K_TRACER) && !defined(__CHECKER__)
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/net/wireless/ath/ath5k
+#define TRACE_INCLUDE_PATH ../../drivers/net/wireless/ath/ath5k
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE trace
 

@@ -39,7 +39,7 @@ TRACE_EVENT(balloon_status,
 	);
 
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH /home/smith/android_kernel_lenovo_paladin/drivers/hv
+#define TRACE_INCLUDE_PATH ../../drivers/hv
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE hv_trace_balloon
 #endif /* _HV_TRACE_BALLOON_H */
