@@ -4601,6 +4601,20 @@ static int dsi_display_get_dfps_timing(struct dsi_display *display,
 		DSI_ERR("Invalid params\n");
 		return -EINVAL;
 	}
+	if (adj_mode->timing.refresh_rate == 144 &&
+			display->panel &&
+			(strstr(display->panel->name, "nt36532 tianma") ||
+			 strstr(display->panel->name, "nt36532 boe"))) {
+		/* TB371FC TASK-033: port of the stock private 144Hz channel
+		 * (Image-b get_dfps_timing special branch): constant pixel
+		 * clock, wire-domain hfp narrowed 402->146, vfp stays at
+		 * the 26 base. Vanilla VFP math can only slow down
+		 * (120->144 computes -315) and a switch that never
+		 * completes wedges the vendor composer. */
+		adj_mode->timing.h_front_porch = 146;
+		adj_mode->timing.v_front_porch = 26;
+		return 0;
+	}
 	m_ctrl = display->ctrl[display->clk_master_idx].ctrl;
 
 	dsi_panel_get_dfps_caps(display->panel, &dfps_caps);

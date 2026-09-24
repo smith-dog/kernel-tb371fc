@@ -972,8 +972,11 @@ int dsi_connector_get_modes(struct drm_connector *connector, void *data,
 		 * thread blocks in executeCommands -> watchdog kills
 		 * system_server (boot loop). Keep the stock 4-slot order so
 		 * vendor SetActiveConfig indexes keep resolving: re-slot any
-		 * unreachable entry as plain 120Hz. */
-		if (mode_rr != 60 && mode_rr != 30 && mode_rr != 120)
+		 * unreachable entry as plain 120Hz. Since TASK-033 the 144Hz
+		 * tier carries real wire porches (dsi_display_get_dfps_timing
+		 * stock-channel branch), so it is exposed unmodified. */
+		if (mode_rr != 60 && mode_rr != 30 && mode_rr != 120 &&
+		    mode_rr != 144)
 			modes[i].timing.refresh_rate = 120;
 
 		memset(&drm_mode, 0x0, sizeof(drm_mode));

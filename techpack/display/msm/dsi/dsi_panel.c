@@ -2227,6 +2227,7 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"mi,mdss-dsi-greenish-gamma-set-command",
 	"mi,mdss-dsi-black-setting-command",
 	"mi,mdss-dsi-read-lockdown-info-command",
+	"qcom,mdss-dsi-dispparam-pen-144hz-command",
 	"qcom,mdss-dsi-dispparam-pen-120hz-command",
 	"qcom,mdss-dsi-dispparam-pen-60hz-command",
 	"qcom,mdss-dsi-dispparam-pen-30hz-command",
@@ -2355,6 +2356,7 @@ const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
 	"mi,mdss-dsi-greenish-gamma-set-command-state",
 	"mi,mdss-dsi-black-setting-command-state",
 	"mi,mdss-dsi-read-lockdown-info-command-state",
+	"qcom,mdss-dsi-dispparam-pen-144hz-command-state",
 	"qcom,mdss-dsi-dispparam-pen-120hz-command-state",
 	"qcom,mdss-dsi-dispparam-pen-60hz-command-state",
 	"qcom,mdss-dsi-dispparam-pen-30hz-command-state",
@@ -5249,7 +5251,13 @@ int dsi_panel_post_enable(struct dsi_panel *panel)
 		goto error;
 	}
 error:
-	if (panel->host_config.phy_type == DSI_PHY_TYPE_CPHY || panel->mi_cfg.panel_id == 0x4C38314100420400) {
+	/* TASK-033 n92: stock (Image-b dsi_panel_post_enable) gates the
+	 * TP fps pen cmds on the spinel nt36532 panel names; the
+	 * CPHY/panel_id form was the trimmed always-false variant that
+	 * left the TDDI panel deaf to the 144Hz tier (FACT-026 storm). */
+	if (panel->name &&
+	    (strstr(panel->name, "nt36532 tianma") ||
+	     strstr(panel->name, "nt36532 boe"))) {
 		rc = dsi_panel_match_fps_pen_setting(panel, panel->cur_mode);
 		if (rc) {
 			DSI_ERR("[%s] failed to update TP fps code setting, rc=%d\n",

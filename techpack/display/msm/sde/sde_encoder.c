@@ -5147,7 +5147,9 @@ void sde_encoder_kickoff(struct drm_encoder *drm_enc, bool is_error)
 		adj_mode = bridge->dsi_mode;
 		dsi_display = bridge->display;
 		if (dsi_display && dsi_display->panel
-			&& (dsi_display->panel->host_config.phy_type == DSI_PHY_TYPE_CPHY || dsi_display->panel->mi_cfg.panel_id == 0x4C38314100420400)
+			&& (dsi_display->panel->name &&
+			    (strstr(dsi_display->panel->name, "nt36532 tianma") ||
+			     strstr(dsi_display->panel->name, "nt36532 boe")))
 			&& adj_mode.dsi_mode_flags & DSI_MODE_FLAG_VRR) {
 			mutex_lock(&dsi_display->panel->panel_lock);
 			sde_encoder_vid_wait_for_active(drm_enc);
@@ -5171,8 +5173,14 @@ void sde_encoder_kickoff(struct drm_encoder *drm_enc, bool is_error)
 				nsecs_to_jiffies(ktime_to_ns(wakeup_time)));
 	}
 
+	/* TASK-033 n93: stock (Image-b sde_encoder_kickoff+0xc58) gates the
+	 * TP fps pen on the spinel nt36532 panel names; kickoff sampled
+	 * adj_mode before post_kickoff clears VRR, so the pen fires once
+	 * per VRR switch commit (n92 storm fix, runtime leg). */
 	if (dsi_display && dsi_display->panel
-		&& (dsi_display->panel->host_config.phy_type == DSI_PHY_TYPE_CPHY || dsi_display->panel->mi_cfg.panel_id == 0x4C38314100420400)
+		&& (dsi_display->panel->name &&
+			    (strstr(dsi_display->panel->name, "nt36532 tianma") ||
+			     strstr(dsi_display->panel->name, "nt36532 boe")))
 		&& adj_mode.dsi_mode_flags & DSI_MODE_FLAG_VRR) {
 		dsi_panel_match_fps_pen_setting(dsi_display->panel, &adj_mode);
 		mutex_unlock(&dsi_display->panel->panel_lock);
