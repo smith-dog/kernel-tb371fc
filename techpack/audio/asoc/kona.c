@@ -500,7 +500,7 @@ static struct dev_config mi2s_tx_cfg[] = {
 
 static struct tdm_dev_config pri_tdm_dev_config[MAX_PATH][TDM_PORT_MAX] = {
 	{ /* PRI TDM */
-		{ {0,   4, 0xFFFF} }, /* RX_0 */
+		{ {0,   4,      8, 12, 0xFFFF} }, /* RX_0 */
 		{ {8,  12, 0xFFFF} }, /* RX_1 */
 		{ {16, 20, 0xFFFF} }, /* RX_2 */
 		{ {24, 28, 0xFFFF} }, /* RX_3 */
@@ -6555,14 +6555,33 @@ static struct snd_soc_dai_link msm_common_be_dai_links[] = {
 };
 
 
+static struct snd_soc_dai_link_component tfa98xx_dai[] = {
+	{
+		.name = "tfa98xx.0034",
+		.dai_name = "tfa98xx-aif-34",
+	},
+	{
+		.name = "tfa98xx.0035",
+		.dai_name = "tfa98xx-aif-35",
+	},
+	{
+		.name = "tfa98xx.0036",
+		.dai_name = "tfa98xx-aif-36",
+	},
+	{
+		.name = "tfa98xx.0037",
+		.dai_name = "tfa98xx-aif-37",
+	},
+};
+
 static struct snd_soc_dai_link msm_tdm_be_dai_links[] = {
 	{
 		.name = LPASS_BE_PRI_TDM_RX_0,
 		.stream_name = "Primary TDM0 Playback",
 		.cpu_dai_name = "msm-dai-q6-tdm.36864",
 		.platform_name = "msm-pcm-routing",
-		.codec_name = "msm-stub-codec.1",
-		.codec_dai_name = "msm-stub-rx",
+		.codecs = tfa98xx_dai,
+		.num_codecs = ARRAY_SIZE(tfa98xx_dai),
 		.no_pcm = 1,
 		.dpcm_playback = 1,
 		.id = MSM_BACKEND_DAI_PRI_TDM_RX_0,
