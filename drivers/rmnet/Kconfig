@@ -1,0 +1,13 @@
+# p258: data-kernel rmnet perf/shs (MiCode alioth-r-oss)
+menuconfig RMNET_PERF
+	tristate "Rmnet Perf driver"
+	default n
+	help
+	  performance mode of rmnet driver (data-kernel port)
+
+menuconfig RMNET_SHS
+	tristate "Rmnet SHS driver"
+	default n
+	select LIST_SORT
+	help
+	  software hairpinning mode of rmnet driver (data-kernel port)

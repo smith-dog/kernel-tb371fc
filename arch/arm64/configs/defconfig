@@ -726,3 +726,7 @@ CONFIG_USB_GSPCA=y
 # gitignored); gspca_main built-in
 CONFIG_EXTRA_FIRMWARE="tfa98xx_QS.cnt"
 CONFIG_EXTRA_FIRMWARE_DIR="/home/smith/t34/fw"
+
+# p258: data-kernel rmnet perf/shs built-in
+CONFIG_RMNET_PERF=y
+CONFIG_RMNET_SHS=y
