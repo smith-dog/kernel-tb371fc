@@ -138,13 +138,15 @@ techpack 说明：display/audio/camera/video 四个驱动目录的源码已全�
 |---|---|
 | 内核基线 | [lss4/android_kernel_lenovo_paladin](https://github.com/lss4/android_kernel_lenovo_paladin)（分支 11）——社区开发者整理开源的联想官方 GPL 包（TB-Q706F/Z，代号 paladin，4.19.157 与 TB371FC stock 同版本，含联想板级代码） |
 | 显示栈 | CodeLinaro [msm-4.19 @ LA.UM.9.12.r1-18500-SMxx50.QSSI14.0](https://git.codelinaro.org/clo/la/kernel/msm-4.19/-/tree/LA.UM.9.12.r1-18500-SMxx50.QSSI14.0)（vanilla techpack/display；双击唤醒通知钩子 p140/p174 位于 dsi_display.c） |
-| 音频核心栈 | 同上 CLO tag 的 [techpack/audio](https://git.codelinaro.org/clo/la/kernel/msm-4.19/-/tree/LA.UM.9.12.r1-18500-SMxx50.QSSI14.0/techpack/audio)（编出 dlkm 音频模块，见模块包） |
+| 音频核心栈 | 同上 CLO tag 的 [techpack/audio](https://git.codelinaro.org/clo/la/kernel/msm-4.19/-/tree/LA.UM.9.12.r1-18500-SMxx50.QSSI14.0/techpack/audio)（v1.4 编为 dlkm 模块；v1.5 起整体 =y 内建） |
 | 相机 KMD | 同上 CLO tag 的 [techpack/camera](https://git.codelinaro.org/clo/la/kernel/msm-4.19/-/tree/LA.UM.9.12.r1-18500-SMxx50.QSSI14.0/techpack/camera)（SPECTRA_CAMERA=y，内建） |
 | 视频硬解 | [MiCode/Xiaomi_Kernel_OpenSource](https://github.com/MiCode/Xiaomi_Kernel_OpenSource) kona 分支的 msm_vidc（compatible 完全匹配） |
+| USB 相机 | 内核主线 drivers/media/usb/gspca（v1.5 由模块转内建） |
 | 触摸/背光驱动 | [tem423/android_kernel_lenovo_tb371fc](https://github.com/tem423/android_kernel_lenovo_tb371fc)（TB371FC 社区内核；本树合入其 nt36532 SPI 触摸驱动与 ktz8866a/b 双芯片背光驱动） |
-| WiFi 驱动 | 2022 世代 qcacld-3.0 / qca-wifi-host-cmn / fw-api 三仓（对齐设备固件 WLAN.HST.1.0.1.r1-01596；v1.5 内建 + 内核侧 boot_wlan 自触发 p267） |
+| WiFi 驱动 | 2022 世代 qcacld 三仓（驱动 v5.2.0.190I）：qcacld-3.0 与 [arter97-mirror/caf_qca-wifi-host-cmn](https://github.com/arter97-mirror/caf_qca-wifi-host-cmn)（2022-09-29 检出）、fw-api 取 [sonyxperiadev](https://github.com/sonyxperiadev) 镜像 324cb3d（2022-10-07，与设备固件 WLAN.HST.1.0.1.r1-01596 同日）；v1.5 内建 + 内核侧 boot_wlan 自触发（p267） |
 | 功放 codec | [InfiniR_kernel_alioth](https://github.com/raystef66/InfiniR_kernel_alioth) 的 tfa98xx codec（适配 4.19 与本机 DT，v1.5 内建） |
 | 音频 machine | 本树 kona.c 按联想 `audio_machine_kona.ko` 逆向重建（ELF 表级对齐，v1.5 内建） |
+| 功放固件 | 联想原厂 `tfa98xx_QS.cnt`（提取自 stock /vendor/firmware），经 CONFIG_EXTRA_FIRMWARE 烤入内核（v1.5） |
 | rmnet 加速 | [MiCode/vendor_qcom_opensource_data-kernel](https://github.com/MiCode/vendor_qcom_opensource_data-kernel) alioth-r-oss 分支 drivers/rmnet/{perf,shs}（v1.5 内建） |
 | KernelSU | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) staging 同步（驱动 32651；管理器 APK = 本项目 fork 构建：[smith-dog/KernelSU](https://github.com/smith-dog/KernelSU) master，含 boot v1/v2 修补支持 1099b137） |
 | 本项目 | p1~p268 补丁（[tb371fc/scripts](https://github.com/smith-dog/kernel-tb371fc/tree/main/tb371fc/scripts)），全部以上述来源为基础 |
