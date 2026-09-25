@@ -720,3 +720,9 @@ CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
 CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
 CONFIG_CRYPTO_CHACHA20_NEON=m
 CONFIG_CRYPTO_AES_ARM64_BS=m
+CONFIG_USB_GSPCA=y
+
+# p254: TASK-034 P5 — tfa98xx container baked in (dir holds the blob,
+# gitignored); gspca_main built-in
+CONFIG_EXTRA_FIRMWARE="tfa98xx_QS.cnt"
+CONFIG_EXTRA_FIRMWARE_DIR="/home/smith/t34/fw"
