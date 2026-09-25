@@ -17,7 +17,7 @@ upgrades never require a kernel rebuild.
 
 ## 这是什么 / What is this
 
-原厂内核存在大量功能缺陷且停止维护。本项目在其 GPL 源码上完成了：
+本项目旨在**拓展内核能力**——在联想 GPL 公开源码之上，持续为设备带来超出原厂形态的功能支持：
 
 - **音视频**：扬声器全链路（4×TFA9894 功放 + CLO 音频核心栈，v1.5 全内建，
   功放固件烤入内核，冷启动出声更快）、相机录像、venus 硬解码
@@ -77,13 +77,13 @@ adb shell "su -c 'sh /data/local/tmp/tb371fc-payload-cleanup.sh'"
 **日后升级 KernelSU**：直接在管理器内升级；或换刷新版 kspatched 镜像，内核无需重刷。
 
 <details>
-<summary>旧方法（v1.4 纯净镜像 + 管理器修补）</summary>
+<summary>备选方法（v1.5 纯净镜像 + 管理器修补，效果同 kspatched 直刷）</summary>
 
-1. 下载 [Release v1.4](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.4)
-   中的 [`boot-v27n89-pure-q706.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.4/boot-v27n89-pure-q706.img) 与 [`KernelSU_32630c-98-g1099b137_32735-release.apk`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.4/KernelSU_32630c-98-g1099b137_32735-release.apk)（也可直接用同 Release 的 `kernelsu_patched_20260924_084550.img` 免修补直刷）
+1. 下载 [Release v1.5](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.5)
+   中的 [`boot-v27n96c-pure-q706.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.5/boot-v27n96c-pure-q706.img) 与 [`KernelSU_32630c-98-g1099b137_32735-release.apk`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.5/KernelSU_32630c-98-g1099b137_32735-release.apk)
 2. 安装 APK，打开 KernelSU 管理器 → **安装** → **选择并修补一个文件** →
-   选 `boot-v27n89-pure-q706.img` → LKM 处选 **"使用本地 LKM 文件"** →
-   选 `ksu-v27n89.ko` → 生成 `kernelsu_patched_*.img`
+   选 `boot-v27n96c-pure-q706.img` → LKM 处选 **"使用本地 LKM 文件"** →
+   选 [`ksu-v27n96c.ko`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.5/ksu-v27n96c.ko) → 生成 `kernelsu_patched_*.img`
 3. 刷入并重启：
    ```
    fastboot flash boot kernelsu_patched_*.img
