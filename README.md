@@ -1,8 +1,10 @@
 # TB371FC Custom Kernel — 4.19.198-perf+
 
 联想小新 Pad Pro 12.7 2021（TB371FC，高通 SM8250/kona）的自定义内核。
-基于联想 GPL 公开源码 + 完整 bring-up 补丁集，KernelSU 以 LKM（可加载模块）
-形态运行，与内核镜像完全解耦。
+基于联想 GPL 公开源码 + 完整 bring-up 补丁集。**v1.5 起 WiFi/音频/加速等
+全部驱动内建进内核镜像，功能开箱即用：刷入一个镜像即完成全部安装，无需
+任何载荷包或后续步骤。** KernelSU 以 LKM（可加载模块）形态运行，与内核
+镜像完全解耦。
 
 **A custom kernel for the Lenovo Xiaoxin Pad Pro 12.7 2021 (TB371FC,
 Qualcomm SM8250/kona)**, built from the official Lenovo GPL source dump
@@ -17,8 +19,8 @@ upgrades never require a kernel rebuild.
 
 原厂内核存在大量功能缺陷且停止维护。本项目在其 GPL 源码上完成了：
 
-- **音视频**：扬声器全链路（4×TFA9894 功放 + CLO 音频核心栈）、相机录像、
-  venus 硬解码
+- **音视频**：扬声器全链路（4×TFA9894 功放 + CLO 音频核心栈，v1.5 全内建，
+  功放固件烤入内核，冷启动出声更快）、相机录像、venus 硬解码
 - **充电**：充电保护（40-60% 电量保持）、电池养护开关、充电状态自反馈死循环修复
 - **外设**：指纹（供电轨修复）、WiFi/蓝牙、双扬声器唤醒、双击亮屏
   （DT2W：手势武装/退出时序重构 + 唤醒恢复改为面板上电前同步全量固件重刷）、
@@ -26,6 +28,9 @@ upgrades never require a kernel rebuild.
 - **系统兼容**：VINTF 兼容（消除开机"设备内部出现问题"弹窗）、睡眠（deep suspend）
 - **Root**：KernelSU 32651（backslashxx fork，已同步上游 staging）以 LKM 运行，管理器一键修补升级
 - **Docker**：iptables 全套 + xt_addrtype（docker0 网络初始化规则依赖）已齐
+- **零依赖（v1.5）**：WiFi（2022 世代 qcacld 三仓）、音频全栈（Lenovo machine
+  驱动源码化重建 + tfa98xx codec）、rmnet 加速、gspca 全部内建；功放固件烤入；
+  WiFi 开机由内核自触发（约 15 秒内自动连网）。`lsmod` 仅有 KernelSU 一行。
 
 **Fixes over stock**: speaker audio chain, camera video recording, fingerprint
 power rail, charge-protection feedback loop (36/s kernel vote storm → 0),
@@ -33,7 +38,7 @@ boot-time "internal problem" dialog (VINTF kernel-version/config match),
 panel wake, suspend, double-tap-to-wake, USB-C OTG auto-host,
 KernelSU-as-LKM decoupling.
 Full patch history in
-`tb371fc/scripts/` (p1–p130).
+`tb371fc/scripts/` (p1–p268).
 
 ---
 
@@ -41,18 +46,35 @@ Full patch history in
 
 > 前提：Bootloader 已解锁（`fastboot flashing unlock`）。
 
-1. 下载 [Release v1.4](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.4)
-   中的 [`kernelsu_patched_20260924_084550.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.4/kernelsu_patched_20260924_084550.img)（v27n89，已含 root，直刷即可）与
-   [`tb371fc-dlkm-pkg-fixed.tar.gz`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.3/tb371fc-dlkm-pkg-fixed.tar.gz)（vendor 模块载荷包，v1.3 起无更新，内含一键安装说明）
+**v1.5 起：刷入一个镜像即完成全部安装。**
+
+1. 从 [Release v1.5](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v1.5)
+   下载镜像（二选一）：
+   - [`boot-v27n96c-kspatched-flash.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.5/boot-v27n96c-kspatched-flash.img)——**推荐**，KernelSU LKM 已内置，直刷即有 root
+   - [`boot-v27n96c-pure-q706.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.5/boot-v27n96c-pure-q706.img)——纯净/APatch 基底，不带 KernelSU（`lsmod` 为空）
 2. 刷入并重启：
    ```
-   fastboot flash boot kernelsu_patched_20260924_084550.img
+   fastboot flash boot boot-v27n96c-kspatched-flash.img
    fastboot reboot
    ```
-3. 开机后 KernelSU 管理器显示"正常/LKM"即 root 就绪；按载荷包内 README
-   安装 vendor 模块（WiFi/音频等）
+3. 完成。WiFi 开机约 15 秒内由内核自动触发连网，扬声器/录音/触摸/144Hz
+   开箱即用。
 
-**日后升级 KernelSU**：只替换 `/data/adb/tb371fc-dlkm/ksu.ko` 并重启，**内核无需重刷**。
+**⚠️ 刷过旧载荷包（tb371fc-dlkm-pkg-fixed.tar.gz，v1.4 及更早教程装过）的，
+刷完新内核后先跑一遍清理脚本**——旧载荷包在新内核上已无用，且每次开机
+仍会尝试加载 7 个失效模块。下载 Release v1.5 中的
+[`tb371fc-payload-cleanup.sh`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v1.5/tb371fc-payload-cleanup.sh)：
+
+```
+adb push tb371fc-payload-cleanup.sh /data/local/tmp/
+adb shell "su -c 'sh /data/local/tmp/tb371fc-payload-cleanup.sh'"
+```
+
+脚本只做移动（全部文件进 `/sdcard/Download/tb371fc-payload-removed-<时间>/`，
+可随时移回），不删除任何东西；在旧内核上运行会被拒绝（旧内核仍依赖载荷包）。
+清理完成后重启即可。
+
+**日后升级 KernelSU**：直接在管理器内升级；或换刷新版 kspatched 镜像，内核无需重刷。
 
 <details>
 <summary>旧方法（v1.4 纯净镜像 + 管理器修补）</summary>
@@ -95,12 +117,17 @@ python3 tb371fc/tools/repack_boot.py <apatch_base.img> \
     arch/arm64/boot/Image out/boot.img out/dtbs/tail-new.bin
 ```
 
+**v1.5 构建注意**：WiFi 驱动为 2022 世代 qcacld 三仓（`drivers/staging/` 下
+qcacld-3.0/qca-wifi-host-cmn/fw-api，体积原因不入 git），完整重建请用
+`tb371fc/scripts/p224-build.sh`（自动换装+补丁+构建+打包 boot 镜像），
+外部源检出说明见脚本头注释。
+
 LKM 注意：`CONFIG_KSU=m` 时 ksu.ko 需要本树 `drivers/ksu_sym.c`
 （48 个非公开符号的 EXPORT 垫片，已内建在树中）。`tb371fc/tools/` 内含
 repack/insmod128/dtbo 等工具与源码（[tools 目录](https://github.com/smith-dog/kernel-tb371fc/tree/main/tb371fc/tools)）。
 
 techpack 说明：display/audio/camera/video 四个驱动目录的源码已全部入库
-（与出货内核一致，相机 KMD 内建、音频编为 dlkm 模块），仅构建产物
+（与出货内核一致，相机 KMD 内建；v1.5 起音频栈整体 =y 内建），仅构建产物
 （*.o/*.a/*.cmd 等）被忽略。
 
 ---
@@ -115,8 +142,12 @@ techpack 说明：display/audio/camera/video 四个驱动目录的源码已全�
 | 相机 KMD | 同上 CLO tag 的 [techpack/camera](https://git.codelinaro.org/clo/la/kernel/msm-4.19/-/tree/LA.UM.9.12.r1-18500-SMxx50.QSSI14.0/techpack/camera)（SPECTRA_CAMERA=y，内建） |
 | 视频硬解 | [MiCode/Xiaomi_Kernel_OpenSource](https://github.com/MiCode/Xiaomi_Kernel_OpenSource) kona 分支的 msm_vidc（compatible 完全匹配） |
 | 触摸/背光驱动 | [tem423/android_kernel_lenovo_tb371fc](https://github.com/tem423/android_kernel_lenovo_tb371fc)（TB371FC 社区内核；本树合入其 nt36532 SPI 触摸驱动与 ktz8866a/b 双芯片背光驱动） |
+| WiFi 驱动 | 2022 世代 qcacld-3.0 / qca-wifi-host-cmn / fw-api 三仓（对齐设备固件 WLAN.HST.1.0.1.r1-01596；v1.5 内建 + 内核侧 boot_wlan 自触发 p267） |
+| 功放 codec | [InfiniR_kernel_alioth](https://github.com/raystef66/InfiniR_kernel_alioth) 的 tfa98xx codec（适配 4.19 与本机 DT，v1.5 内建） |
+| 音频 machine | 本树 kona.c 按联想 `audio_machine_kona.ko` 逆向重建（ELF 表级对齐，v1.5 内建） |
+| rmnet 加速 | [MiCode/vendor_qcom_opensource_data-kernel](https://github.com/MiCode/vendor_qcom_opensource_data-kernel) alioth-r-oss 分支 drivers/rmnet/{perf,shs}（v1.5 内建） |
 | KernelSU | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) staging 同步（驱动 32651；管理器 APK = 本项目 fork 构建：[smith-dog/KernelSU](https://github.com/smith-dog/KernelSU) master，含 boot v1/v2 修补支持 1099b137） |
-| 本项目 | p1~p197 补丁（[tb371fc/scripts](https://github.com/smith-dog/kernel-tb371fc/tree/main/tb371fc/scripts)），全部以上述来源为基础 |
+| 本项目 | p1~p268 补丁（[tb371fc/scripts](https://github.com/smith-dog/kernel-tb371fc/tree/main/tb371fc/scripts)），全部以上述来源为基础 |
 
 联想未随 GPL dump 公开的部分（如 144Hz 显示驱动、部分面板参数）不在本树，
 对应功能保持原厂形态。

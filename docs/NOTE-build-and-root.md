@@ -1,3 +1,10 @@
+# ⚠️ v1.5 起本流程已废弃
+
+本文描述的载荷包(tb371fc-dlkm)部署方式仅适用于 v1.4 及更早内核。
+v1.5 起全部驱动内建,**刷入单一 boot 镜像即完成安装,无需载荷包**;
+刷过载荷包的请用 Release v1.5 的 tb371fc-payload-cleanup.sh 清理。
+当前权威流程见 [README.md](../README.md)。以下为历史文档。
+
 # NOTE — TB371FC 内核构建与 Root 流程（smith-dog/kernel-tb371fc）
 
 > 适用：本项目全部 v27n 系列内核（4.19.198-perf+，CONFIG_KSU=m 纯 LKM 形态）。
