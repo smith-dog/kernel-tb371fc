@@ -269,3 +269,26 @@ hdmi_dlkm-y := $(HDMICODEC_OBJS)
 
 # inject some build related information
 DEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+
+# p229: tfa98xx codec (TASK-034 P4-A1, ported from alioth 16.0-alioth)
+obj-y += tfa98xx/
+
+# p229/p238: tfa98xx codec ported from alioth; built via 'obj-y += tfa98xx/' above
+
+# p229/p238: tfa98xx codec ported from alioth; built via 'obj-y += tfa98xx/' above
+
+# p229/p238: tfa98xx codec ported from alioth; built via 'obj-y += tfa98xx/' above
+
+# p229/p238: tfa98xx codec ported from alioth; built via 'obj-y += tfa98xx/' above
+
+# p229/p238: tfa98xx codec ported from alioth; built via 'obj-y += tfa98xx/' above
+
+# p229/p238: tfa98xx codec ported from alioth; built via 'obj-y += tfa98xx/' above
+
+# p229/p238: tfa98xx codec ported from alioth; built via 'obj-y += tfa98xx/' above
+
+# p229/p238: tfa98xx codec ported from alioth; built via 'obj-y += tfa98xx/' above
+
+# p229/p238: tfa98xx codec ported from alioth; built via 'obj-y += tfa98xx/' above
+
+# p229/p238: tfa98xx codec ported from alioth; built via 'obj-y += tfa98xx/' above
