@@ -1169,13 +1169,26 @@ static int i2c_hid_of_probe(struct i2c_client *client,
 	u32 val;
 	int ret;
 
-    ret = of_get_named_gpio(dev->of_node, "kb,output-gpio", 0);
+	ret = of_get_named_gpio(dev->of_node, "kb,output-gpio", 0);
 	if (ret < 0) {
-		dev_err(&client->dev, "Invalid output-gpio in dt: %d", ret);
 		pdata->output_gpio = -1;
 	} else {
 		pdata->output_gpio = ret;
 		dev_err(&client->dev, "Got output-gpio1 in dt: %d", ret);
+	}
+
+	/* p284: TB371FC magnetic keyboard MCU reset (active low). The stock
+	 * DT names it mcu_rst_gpio; accept either name so the reset can be
+	 * released before the first i2c transfer.
+	 */
+	if (pdata->output_gpio < 0) {
+		ret = of_get_named_gpio(dev->of_node, "mcu_rst_gpio", 0);
+		if (ret >= 0) {
+			pdata->output_gpio = ret;
+			dev_info(dev, "p284: got mcu_rst_gpio in dt: %d\n", ret);
+		} else {
+			dev_info(dev, "p284: no reset gpio property (%d)\n", ret);
+		}
 	}
 	
 	ret = of_property_read_u32(dev->of_node, "hid-descr-addr", &val);
@@ -1298,6 +1311,24 @@ static int i2c_hid_probe(struct i2c_client *client,
 	/* Parse platform agnostic common properties from ACPI / device tree */
 	i2c_hid_fwnode_probe(client, &ihid->pdata);
 
+	/* p284: release the keyboard MCU reset BEFORE the first i2c
+	 * transfer — a reset-held MCU would fail the descriptor fetch with
+	 * ENOTCONN. */
+	if ((ihid->pdata.output_gpio != -1) &&
+	    gpio_is_valid(ihid->pdata.output_gpio)) {
+		ret = gpio_request(ihid->pdata.output_gpio, "kb_output_gpio");
+		if (ret && ret != -EBUSY)
+			dev_warn(&client->dev,
+				 "p284: reset gpio request failed: %d\n", ret);
+		if (gpio_direction_output(ihid->pdata.output_gpio, 1))
+			dev_warn(&client->dev,
+				 "p284: failed to deassert reset gpio\n");
+		else
+			dev_info(&client->dev,
+				 "p284: mcu reset released (gpio %d)\n",
+				 ihid->pdata.output_gpio);
+	}
+
 	ihid->pdata.supplies[0].supply = "vdd";
 	ihid->pdata.supplies[1].supply = "vddl";
 
@@ -1407,17 +1438,6 @@ static int i2c_hid_probe(struct i2c_client *client,
 		lenovo_i2c_kb_probe_done = true;
 	}
 
-	if ((ihid->pdata.output_gpio != -1) && gpio_is_valid(ihid->pdata.output_gpio)) {
-		ret = gpio_request(ihid->pdata.output_gpio, "kb_output_gpio");
-		if(ret){
-			hid_err(hid, "request for reset failed, r=%d,gpio=%d.\n", ret, ihid->pdata.output_gpio);
-		}
-		ret = gpio_direction_output(ihid->pdata.output_gpio, 1);
-		if(ret){
-			hid_err(hid, "unable to set dirout reset gpio r=%d,gpio=%d.\n", ret, ihid->pdata.output_gpio);
-		}
-	}
-	
 	return 0;
 
 err_mem_free:
