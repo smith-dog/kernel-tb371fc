@@ -947,6 +947,10 @@ int adm_set_pp_params(int port_id, int copp_idx,
 	int size = 0;
 	int port_idx = 0;
 	int ret = 0;
+	u8 *pd = NULL;
+	u32 ph_size = 0;
+	u16 inst = 0;
+	u16 pid = 0;
 
 	port_id = afe_convert_virtual_to_portid(port_id);
 	port_idx = adm_validate_and_get_port_index(port_id);
@@ -1006,6 +1010,34 @@ int adm_set_pp_params(int port_id, int copp_idx,
 	ret = adm_apr_send_pkt((uint32_t *) adm_set_params,
 			&this_adm.copp.wait[port_idx][copp_idx],
 			port_idx, copp_idx, adm_set_params->apr_hdr.opcode);
+
+	/* p280: some copp topologies on the Lenovo ADSP (BT SCO uplink)
+	 * reject the V6 param envelope (ADSP_EUNSUPPORTED) and the uplink
+	 * gain falls back to default (quiet BT headset mic). Retry once
+	 * with the V5 opcode and a v2-style param header: both headers are
+	 * 12 bytes, v2 = param_id at offset 4 with no instance id.
+	 */
+	if (ret && param_data != NULL &&
+	    adm_set_params->apr_hdr.opcode == ADM_CMD_SET_PP_PARAMS_V6 &&
+	    param_size >= sizeof(struct param_hdr_v3)) {
+		pd = &adm_set_params->param_data[0];
+		memcpy(&ph_size, pd + 8, 4);
+		if (ph_size + sizeof(struct param_hdr_v3) == param_size) {
+			memcpy(&pid, pd + 6, 2);
+			memcpy(pd + 4, &pid, 2);
+			inst = 0;
+			memcpy(pd + 6, &inst, 2);
+			adm_set_params->apr_hdr.opcode =
+				ADM_CMD_SET_PP_PARAMS_V5;
+			pr_info("p280: V6 params rejected on port 0x%x, retrying with V5\n",
+				port_id);
+			ret = adm_apr_send_pkt(
+				(uint32_t *) adm_set_params,
+				&this_adm.copp.wait[port_idx][copp_idx],
+				port_idx, copp_idx,
+				adm_set_params->apr_hdr.opcode);
+		}
+	}
 done:
 	kfree(adm_set_params);
 	return ret;

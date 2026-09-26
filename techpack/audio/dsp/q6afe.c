@@ -3398,6 +3398,35 @@ exit:
 	return cal_block;
 }
 
+/* p282: same-acdb cal fallback ignoring sample rate (BT SCO mic acdb 20
+ * only has a 48k block; the port may run 44.1k for VoIP). The AFE common
+ * cal payload (port gain) is rate agnostic. */
+static struct cal_block_data *afe_find_cal_any_rate(int cal_index, int port_id)
+{
+	struct list_head *ptr, *next;
+	struct cal_block_data *cal_block = NULL;
+	struct audio_cal_info_afe *afe_cal_info = NULL;
+	int afe_port_index = q6audio_get_port_index(port_id);
+	int dev_acdb;
+
+	if (afe_port_index < 0)
+		return NULL;
+	dev_acdb = this_afe.dev_acdb_id[afe_port_index];
+
+	list_for_each_safe(ptr, next,
+			   &this_afe.cal_data[cal_index]->cal_blocks) {
+		cal_block = list_entry(ptr, struct cal_block_data, list);
+		afe_cal_info = cal_block->cal_info;
+		if (afe_cal_info->acdb_id == dev_acdb) {
+			pr_info("p282: fallback cal acdb %d block rate %d -> port rate %d\n",
+				dev_acdb, afe_cal_info->sample_rate,
+				this_afe.afe_sample_rates[afe_port_index]);
+			return cal_block;
+		}
+	}
+	return NULL;
+}
+
 static int send_afe_cal_type(int cal_index, int port_id)
 {
 	struct cal_block_data		*cal_block = NULL;
@@ -3427,9 +3456,11 @@ static int send_afe_cal_type(int cal_index, int port_id)
 	if (((cal_index == AFE_COMMON_RX_CAL) ||
 	     (cal_index == AFE_COMMON_TX_CAL) ||
 	     (cal_index == AFE_LSM_TX_CAL)) &&
-	    (this_afe.dev_acdb_id[afe_port_index] > 0))
+	    (this_afe.dev_acdb_id[afe_port_index] > 0)) {
 		cal_block = afe_find_cal(cal_index, port_id);
-	else
+		if (!cal_block)
+			cal_block = afe_find_cal_any_rate(cal_index, port_id);
+	} else
 		cal_block = cal_utils_get_only_cal_block(
 				this_afe.cal_data[cal_index]);
 
