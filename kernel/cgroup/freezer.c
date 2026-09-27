@@ -4,6 +4,7 @@
 #include <linux/sched/task.h>
 #include <linux/sched/signal.h>
 #include <linux/mm.h>
+#include <linux/sched/mm.h>
 #include <linux/sched/types.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
@@ -192,12 +193,15 @@ static void frozen_reclaim_worker(struct work_struct *work)
 	struct task_struct *task = fw->task;
 	struct sched_param param = { .sched_priority = 0 };
 
+	pr_emerg("fzr: worker enter task=%d\n", task->pid);
+
 	/*
 	 * SCHED_IDLE: every UI/application thread preempts the drain; it
 	 * only soaks up cycles nothing else wants. One drain at a time via
 	 * the single-threaded frozen_reclaim_wq.
 	 */
 	sched_setscheduler_nocheck(current, SCHED_IDLE, &param);
+	pr_emerg("fzr: SCHED_IDLE set\n");
 
 	/*
 	 * Skip if the task unfroze before the delay elapsed; reclaiming a
@@ -207,7 +211,9 @@ static void frozen_reclaim_worker(struct work_struct *work)
 	if (!sysctl_frozen_task_reclaim || !task->frozen)
 		goto out;
 
+	pr_emerg("fzr: reclaim begin task=%d\n", task->pid);
 	reclaim_task_anon(task, INT_MAX);
+	pr_emerg("fzr: reclaim done task=%d\n", task->pid);
 out:
 	put_task_struct(task);
 	kfree(fw);
@@ -222,12 +228,28 @@ out:
 static void queue_frozen_reclaim(struct task_struct *task)
 {
 	struct frozen_reclaim_work *fw;
+	struct mm_struct *mm;
+	unsigned long anon, swapents;
 
 	if (!sysctl_frozen_task_reclaim || !frozen_reclaim_wq)
 		return;
 	if (task != task->group_leader)
 		return;
 	if (task->flags & PF_EXITING)
+		return;
+
+	/*
+	 * Skip already-drained tasks: the freeze/unfreeze oscillation would
+	 * otherwise re-walk their (mostly swapped-out) memory forever - the
+	 * 46-passes-per-task CPU pump measured on #170.
+	 */
+	mm = get_task_mm(task);
+	if (!mm)
+		return;
+	anon = get_mm_counter(mm, MM_ANONPAGES);
+	swapents = get_mm_counter(mm, MM_SWAPENTS);
+	mmput(mm);
+	if (swapents * 2 >= anon)
 		return;
 
 	fw = kzalloc(sizeof(*fw), GFP_KERNEL);
@@ -237,6 +259,7 @@ static void queue_frozen_reclaim(struct task_struct *task)
 	get_task_struct(task);
 	fw->task = task;
 	queue_delayed_work(frozen_reclaim_wq, &fw->work, HZ);
+	pr_emerg("fzr: queued task=%d\n", task->pid);
 }
 static int __init frozen_reclaim_wq_init(void)
 {

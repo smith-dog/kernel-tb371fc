@@ -1841,6 +1841,7 @@ struct reclaim_param reclaim_task_anon(struct task_struct *task,
 	};
 
 	get_task_struct(task);
+	pr_emerg("fzanon: enter task=%d\n", task->pid);
 	mm = get_task_mm(task);
 	if (!mm)
 		goto out;
@@ -1851,6 +1852,7 @@ struct reclaim_param reclaim_task_anon(struct task_struct *task,
 	reclaim_walk.private = &rp;
 
 	down_read(&mm->mmap_sem);
+	pr_emerg("fzanon: mmap_sem rd held\n");
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
 		if (is_vm_hugetlb_page(vma))
 			continue;
@@ -1862,13 +1864,16 @@ struct reclaim_param reclaim_task_anon(struct task_struct *task,
 			break;
 
 		rp.vma = vma;
+		pr_info("fzanon: walk %lx-%lx begin\n", vma->vm_start, vma->vm_end);
 		walk_page_range(vma->vm_start, vma->vm_end,
 			&reclaim_walk);
+		pr_info("fzanon: walked %lx-%lx done\n", vma->vm_start, vma->vm_end);
 	}
 
 	flush_tlb_mm(mm);
 	up_read(&mm->mmap_sem);
 	mmput(mm);
+	pr_emerg("fzanon: done\n");
 out:
 	put_task_struct(task);
 	return rp;
