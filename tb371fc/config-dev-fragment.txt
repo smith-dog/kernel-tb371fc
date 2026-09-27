@@ -1,0 +1,5 @@
+# dev 分支诊断开关——构建 dev 前合并进 .config（make olddefconfig 生效）
+CONFIG_NETCONSOLE=m
+CONFIG_NETCONSOLE_DYNAMIC=y
+CONFIG_DETECT_HUNG_TASK=y
+CONFIG_SOFTLOCKUP_DETECTOR=y
