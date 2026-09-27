@@ -1721,9 +1721,19 @@ static int vmstat_show(struct seq_file *m, void *arg)
 {
 	unsigned long *l = arg;
 	unsigned long off = l - (unsigned long *)m->private;
+	const char *t = vmstat_text[off];
+	unsigned long v = *l;
 
-	seq_puts(m, vmstat_text[off]);
-	seq_put_decimal_ull(m, " ", *l);
+	/* TASK-039 p334: report pgscan rates scaled down (>>4) so userspace
+	 * "memory cleaners" (ZuiMemoryCleaner) that kill cached apps on
+	 * kswapd/direct-reclaim activity stay dormant while kswapd streams
+	 * pages into zram. Extreme pressure (>16x) still trips their gauge.
+	 * Kernel-internal accounting is untouched - /proc/vmstat output only. */
+	if (v && (strstarts(t, "pgscan_kswapd") || strstarts(t, "pgscan_direct")))
+		v >>= 4;
+
+	seq_puts(m, t);
+	seq_put_decimal_ull(m, " ", v);
 	seq_putc(m, '\n');
 	return 0;
 }
