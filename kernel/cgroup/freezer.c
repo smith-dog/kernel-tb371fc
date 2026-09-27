@@ -4,6 +4,7 @@
 #include <linux/sched/task.h>
 #include <linux/sched/signal.h>
 #include <linux/mm.h>
+#include <linux/sched/types.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 
@@ -177,26 +178,37 @@ static void cgroup_freeze_task(struct task_struct *task, bool freeze)
 
 #ifdef CONFIG_PROCESS_RECLAIM
 int sysctl_frozen_task_reclaim = 1;
+static struct workqueue_struct *frozen_reclaim_wq;
 
 struct frozen_reclaim_work {
-	struct delayed_work	work;
+	struct work_struct	work;
 	struct task_struct	*task;
 };
 
-static void frozen_reclaim_worker(struct work_struct *w)
+static void frozen_reclaim_worker(struct work_struct *work)
 {
 	struct frozen_reclaim_work *fw =
-		container_of(to_delayed_work(w), struct frozen_reclaim_work, work);
+		container_of(work, struct frozen_reclaim_work, work);
 	struct task_struct *task = fw->task;
+	struct sched_param param = { .sched_priority = 0 };
+
+	/*
+	 * SCHED_IDLE: every UI/application thread preempts the drain; it
+	 * only soaks up cycles nothing else wants. One drain at a time via
+	 * the single-threaded frozen_reclaim_wq.
+	 */
+	sched_setscheduler_nocheck(current, SCHED_IDLE, &param);
 
 	/*
 	 * Skip if the task unfroze before the delay elapsed; reclaiming a
 	 * running task's pages would just fault back in. Exited tasks are
 	 * handled inside reclaim_task_anon() (get_task_mm() returns NULL).
 	 */
-	if (task->frozen)
-		reclaim_task_anon(task, INT_MAX);
+	if (!sysctl_frozen_task_reclaim || !task->frozen)
+		goto out;
 
+	reclaim_task_anon(task, INT_MAX);
+out:
 	put_task_struct(task);
 	kfree(fw);
 }
@@ -209,7 +221,7 @@ static void queue_frozen_reclaim(struct task_struct *task)
 {
 	struct frozen_reclaim_work *fw;
 
-	if (!sysctl_frozen_task_reclaim)
+	if (!sysctl_frozen_task_reclaim || !frozen_reclaim_wq)
 		return;
 	if (task->flags & PF_EXITING)
 		return;
@@ -217,11 +229,19 @@ static void queue_frozen_reclaim(struct task_struct *task)
 	fw = kzalloc(sizeof(*fw), GFP_KERNEL);
 	if (!fw)
 		return;
-	INIT_DELAYED_WORK(&fw->work, frozen_reclaim_worker);
+	INIT_WORK(&fw->work, frozen_reclaim_worker);
 	get_task_struct(task);
 	fw->task = task;
-	schedule_delayed_work(&fw->work, HZ);
+	queue_delayed_work(frozen_reclaim_wq, &fw->work, HZ);
 }
+static int __init frozen_reclaim_wq_init(void)
+{
+	frozen_reclaim_wq = alloc_workqueue("frozen_reclaim",
+					     WQ_UNBOUND | WQ_FREEZABLE, 1);
+
+	return frozen_reclaim_wq ? 0 : -ENOMEM;
+}
+__initcall(frozen_reclaim_wq_init);
 #endif
 
 /*
