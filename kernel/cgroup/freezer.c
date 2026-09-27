@@ -178,18 +178,18 @@ static void cgroup_freeze_task(struct task_struct *task, bool freeze)
 }
 
 #ifdef CONFIG_PROCESS_RECLAIM
-int sysctl_frozen_task_reclaim;
 static struct workqueue_struct *frozen_reclaim_wq;
 
 struct frozen_reclaim_work {
-	struct work_struct	work;
+	struct delayed_work	dwork;
 	struct task_struct	*task;
 };
 
 static void frozen_reclaim_worker(struct work_struct *work)
 {
+	struct delayed_work *dw = to_delayed_work(work);
 	struct frozen_reclaim_work *fw =
-		container_of(work, struct frozen_reclaim_work, work);
+		container_of(dw, struct frozen_reclaim_work, dwork);
 	struct task_struct *task = fw->task;
 	struct sched_param param = { .sched_priority = 0 };
 
@@ -208,7 +208,7 @@ static void frozen_reclaim_worker(struct work_struct *work)
 	 * running task's pages would just fault back in. Exited tasks are
 	 * handled inside reclaim_task_anon() (get_task_mm() returns NULL).
 	 */
-	if (!sysctl_frozen_task_reclaim || !task->frozen)
+	if (!task->frozen)
 		goto out;
 
 	pr_emerg("fzr: reclaim begin task=%d\n", task->pid);
@@ -231,7 +231,7 @@ static void queue_frozen_reclaim(struct task_struct *task)
 	struct mm_struct *mm;
 	unsigned long anon, swapents;
 
-	if (!sysctl_frozen_task_reclaim || !frozen_reclaim_wq)
+	if (!frozen_reclaim_wq)
 		return;
 	if (task != task->group_leader)
 		return;
@@ -255,10 +255,10 @@ static void queue_frozen_reclaim(struct task_struct *task)
 	fw = kzalloc(sizeof(*fw), GFP_KERNEL);
 	if (!fw)
 		return;
-	INIT_WORK(&fw->work, frozen_reclaim_worker);
+	INIT_DELAYED_WORK(&fw->dwork, frozen_reclaim_worker);
 	get_task_struct(task);
 	fw->task = task;
-	queue_delayed_work(frozen_reclaim_wq, &fw->work, HZ);
+	queue_delayed_work(frozen_reclaim_wq, &fw->dwork, HZ);
 	pr_emerg("fzr: queued task=%d\n", task->pid);
 }
 static int __init frozen_reclaim_wq_init(void)
