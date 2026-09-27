@@ -3,6 +3,9 @@
 #include <linux/sched.h>
 #include <linux/sched/task.h>
 #include <linux/sched/signal.h>
+#include <linux/mm.h>
+#include <linux/slab.h>
+#include <linux/workqueue.h>
 
 #include "cgroup-internal.h"
 
@@ -172,6 +175,55 @@ static void cgroup_freeze_task(struct task_struct *task, bool freeze)
 	unlock_task_sighand(task, &flags);
 }
 
+#ifdef CONFIG_PROCESS_RECLAIM
+int sysctl_frozen_task_reclaim = 1;
+
+struct frozen_reclaim_work {
+	struct delayed_work	work;
+	struct task_struct	*task;
+};
+
+static void frozen_reclaim_worker(struct work_struct *w)
+{
+	struct frozen_reclaim_work *fw =
+		container_of(to_delayed_work(w), struct frozen_reclaim_work, work);
+	struct task_struct *task = fw->task;
+
+	/*
+	 * Skip if the task unfroze before the delay elapsed; reclaiming a
+	 * running task's pages would just fault back in. Exited tasks are
+	 * handled inside reclaim_task_anon() (get_task_mm() returns NULL).
+	 */
+	if (task->frozen)
+		reclaim_task_anon(task, INT_MAX);
+
+	put_task_struct(task);
+	kfree(fw);
+}
+
+/*
+ * Queue an anon-page reclaim for a task that just got frozen, so its
+ * pages reach swap (zram) without waiting for watermark pressure.
+ */
+static void queue_frozen_reclaim(struct task_struct *task)
+{
+	struct frozen_reclaim_work *fw;
+
+	if (!sysctl_frozen_task_reclaim)
+		return;
+	if (task->flags & PF_EXITING)
+		return;
+
+	fw = kzalloc(sizeof(*fw), GFP_KERNEL);
+	if (!fw)
+		return;
+	INIT_DELAYED_WORK(&fw->work, frozen_reclaim_worker);
+	get_task_struct(task);
+	fw->task = task;
+	schedule_delayed_work(&fw->work, HZ);
+}
+#endif
+
 /*
  * Freeze or unfreeze all tasks in the given cgroup.
  */
@@ -198,6 +250,8 @@ static void cgroup_do_freeze(struct cgroup *cgrp, bool freeze)
 		if (task->flags & PF_KTHREAD)
 			continue;
 		cgroup_freeze_task(task, freeze);
+		if (freeze)
+			queue_frozen_reclaim(task);
 	}
 	css_task_iter_end(&it);
 
