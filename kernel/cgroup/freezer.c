@@ -177,7 +177,7 @@ static void cgroup_freeze_task(struct task_struct *task, bool freeze)
 }
 
 #ifdef CONFIG_PROCESS_RECLAIM
-int sysctl_frozen_task_reclaim = 1;
+int sysctl_frozen_task_reclaim;
 static struct workqueue_struct *frozen_reclaim_wq;
 
 struct frozen_reclaim_work {
@@ -216,12 +216,16 @@ out:
 /*
  * Queue an anon-page reclaim for a task that just got frozen, so its
  * pages reach swap (zram) without waiting for watermark pressure.
+ * css_task_iter walks threads: only the group leader carries the
+ * process mm, so queue exactly once per process.
  */
 static void queue_frozen_reclaim(struct task_struct *task)
 {
 	struct frozen_reclaim_work *fw;
 
 	if (!sysctl_frozen_task_reclaim || !frozen_reclaim_wq)
+		return;
+	if (task != task->group_leader)
 		return;
 	if (task->flags & PF_EXITING)
 		return;
