@@ -17,12 +17,13 @@ struct wg_device;
 struct wg_peer;
 struct multicore_worker;
 struct crypt_queue;
+struct prev_queue;
 struct sk_buff;
 
 /* queueing.c APIs: */
 int wg_packet_queue_init(struct crypt_queue *queue, work_func_t function,
-			 bool multicore, unsigned int len);
-void wg_packet_queue_free(struct crypt_queue *queue, bool multicore);
+			 unsigned int len);
+void wg_packet_queue_free(struct crypt_queue *queue, bool purge);
 struct multicore_worker __percpu *
 wg_packet_percpu_multicore_worker_alloc(work_func_t function, void *ptr);
 
@@ -74,17 +75,20 @@ static inline bool wg_check_packet_protocol(struct sk_buff *skb)
 
 static inline void wg_reset_packet(struct sk_buff *skb, bool encapsulating)
 {
+	const int pfmemalloc = skb->pfmemalloc;
+	u32 hash = skb->hash;
 	u8 l4_hash = skb->l4_hash;
 	u8 sw_hash = skb->sw_hash;
-	u32 hash = skb->hash;
+
 	skb_scrub_packet(skb, true);
 	memset(&skb->headers_start, 0,
 	       offsetof(struct sk_buff, headers_end) -
 		       offsetof(struct sk_buff, headers_start));
+	skb->pfmemalloc = pfmemalloc;
 	if (encapsulating) {
+		skb->hash = hash;
 		skb->l4_hash = l4_hash;
 		skb->sw_hash = sw_hash;
-		skb->hash = hash;
 	}
 	skb->queue_mapping = 0;
 	skb->nohdr = 0;
@@ -93,13 +97,13 @@ static inline void wg_reset_packet(struct sk_buff *skb, bool encapsulating)
 	skb->dev = NULL;
 #ifdef CONFIG_NET_SCHED
 	skb->tc_index = 0;
-	skb_reset_tc(skb);
 #endif
+	skb_reset_redirect(skb);
 	skb->hdr_len = skb_headroom(skb);
 	skb_reset_mac_header(skb);
 	skb_reset_network_header(skb);
 	skb_reset_transport_header(skb);
-	skb_probe_transport_header(skb, 0);
+	skb_probe_transport_header(skb);
 	skb_reset_inner_headers(skb);
 }
 
@@ -135,8 +139,31 @@ static inline int wg_cpumask_next_online(int *next)
 	return cpu;
 }
 
+void wg_prev_queue_init(struct prev_queue *queue);
+
+/* Multi producer */
+bool wg_prev_queue_enqueue(struct prev_queue *queue, struct sk_buff *skb);
+
+/* Single consumer */
+struct sk_buff *wg_prev_queue_dequeue(struct prev_queue *queue);
+
+/* Single consumer */
+static inline struct sk_buff *wg_prev_queue_peek(struct prev_queue *queue)
+{
+	if (queue->peeked)
+		return queue->peeked;
+	queue->peeked = wg_prev_queue_dequeue(queue);
+	return queue->peeked;
+}
+
+/* Single consumer */
+static inline void wg_prev_queue_drop_peeked(struct prev_queue *queue)
+{
+	queue->peeked = NULL;
+}
+
 static inline int wg_queue_enqueue_per_device_and_peer(
-	struct crypt_queue *device_queue, struct crypt_queue *peer_queue,
+	struct crypt_queue *device_queue, struct prev_queue *peer_queue,
 	struct sk_buff *skb, struct workqueue_struct *wq, int *next_cpu)
 {
 	int cpu;
@@ -145,8 +172,9 @@ static inline int wg_queue_enqueue_per_device_and_peer(
 	/* We first queue this up for the peer ingestion, but the consumer
 	 * will wait for the state to change to CRYPTED or DEAD before.
 	 */
-	if (unlikely(ptr_ring_produce_bh(&peer_queue->ring, skb)))
+	if (unlikely(!wg_prev_queue_enqueue(peer_queue, skb)))
 		return -ENOSPC;
+
 	/* Then we queue it up in the device queue, which consumes the
 	 * packet as soon as it can.
 	 */
@@ -157,9 +185,7 @@ static inline int wg_queue_enqueue_per_device_and_peer(
 	return 0;
 }
 
-static inline void wg_queue_enqueue_per_peer(struct crypt_queue *queue,
-					     struct sk_buff *skb,
-					     enum packet_state state)
+static inline void wg_queue_enqueue_per_peer_tx(struct sk_buff *skb, enum packet_state state)
 {
 	/* We take a reference, because as soon as we call atomic_set, the
 	 * peer can be freed from below us.
@@ -167,14 +193,12 @@ static inline void wg_queue_enqueue_per_peer(struct crypt_queue *queue,
 	struct wg_peer *peer = wg_peer_get(PACKET_PEER(skb));
 
 	atomic_set_release(&PACKET_CB(skb)->state, state);
-	queue_work_on(wg_cpumask_choose_online(&peer->serial_work_cpu,
-					       peer->internal_id),
-		      peer->device->packet_crypt_wq, &queue->work);
+	queue_work_on(wg_cpumask_choose_online(&peer->serial_work_cpu, peer->internal_id),
+		      peer->device->packet_crypt_wq, &peer->transmit_packet_work);
 	wg_peer_put(peer);
 }
 
-static inline void wg_queue_enqueue_per_peer_napi(struct sk_buff *skb,
-						  enum packet_state state)
+static inline void wg_queue_enqueue_per_peer_rx(struct sk_buff *skb, enum packet_state state)
 {
 	/* We take a reference, because as soon as we call atomic_set, the
 	 * peer can be freed from below us.
