@@ -9,19 +9,25 @@
 #include "socket.h"
 #include "queueing.h"
 #include "messages.h"
-#include "uapi/wireguard.h"
+
+#include <uapi/linux/wireguard.h>
+
 #include <linux/if.h>
 #include <net/genetlink.h>
 #include <net/sock.h>
 #include <crypto/algapi.h>
+
+struct __uapi_kernel_timespec {
+	int64_t tv_sec, tv_nsec;
+};
 
 static struct genl_family genl_family;
 
 static const struct nla_policy device_policy[WGDEVICE_A_MAX + 1] = {
 	[WGDEVICE_A_IFINDEX]		= { .type = NLA_U32 },
 	[WGDEVICE_A_IFNAME]		= { .type = NLA_NUL_STRING, .len = IFNAMSIZ - 1 },
-	[WGDEVICE_A_PRIVATE_KEY]	= NLA_POLICY_EXACT_LEN(NOISE_PUBLIC_KEY_LEN),
-	[WGDEVICE_A_PUBLIC_KEY]		= NLA_POLICY_EXACT_LEN(NOISE_PUBLIC_KEY_LEN),
+	[WGDEVICE_A_PRIVATE_KEY]	= { .len = NOISE_PUBLIC_KEY_LEN },
+	[WGDEVICE_A_PUBLIC_KEY]		= { .len = NOISE_PUBLIC_KEY_LEN },
 	[WGDEVICE_A_FLAGS]		= { .type = NLA_U32 },
 	[WGDEVICE_A_LISTEN_PORT]	= { .type = NLA_U16 },
 	[WGDEVICE_A_FWMARK]		= { .type = NLA_U32 },
@@ -29,12 +35,12 @@ static const struct nla_policy device_policy[WGDEVICE_A_MAX + 1] = {
 };
 
 static const struct nla_policy peer_policy[WGPEER_A_MAX + 1] = {
-	[WGPEER_A_PUBLIC_KEY]				= NLA_POLICY_EXACT_LEN(NOISE_PUBLIC_KEY_LEN),
-	[WGPEER_A_PRESHARED_KEY]			= NLA_POLICY_EXACT_LEN(NOISE_SYMMETRIC_KEY_LEN),
+	[WGPEER_A_PUBLIC_KEY]				= { .len = NOISE_PUBLIC_KEY_LEN },
+	[WGPEER_A_PRESHARED_KEY]			= { .len = NOISE_SYMMETRIC_KEY_LEN },
 	[WGPEER_A_FLAGS]				= { .type = NLA_U32 },
-	[WGPEER_A_ENDPOINT]				= NLA_POLICY_MIN_LEN(sizeof(struct sockaddr)),
+	[WGPEER_A_ENDPOINT]				= { .len = sizeof(struct sockaddr) },
 	[WGPEER_A_PERSISTENT_KEEPALIVE_INTERVAL]	= { .type = NLA_U16 },
-	[WGPEER_A_LAST_HANDSHAKE_TIME]			= NLA_POLICY_EXACT_LEN(sizeof(struct __kernel_timespec)),
+	[WGPEER_A_LAST_HANDSHAKE_TIME]			= { .len = sizeof(struct __uapi_kernel_timespec) },
 	[WGPEER_A_RX_BYTES]				= { .type = NLA_U64 },
 	[WGPEER_A_TX_BYTES]				= { .type = NLA_U64 },
 	[WGPEER_A_ALLOWEDIPS]				= { .type = NLA_NESTED },
@@ -43,7 +49,7 @@ static const struct nla_policy peer_policy[WGPEER_A_MAX + 1] = {
 
 static const struct nla_policy allowedip_policy[WGALLOWEDIP_A_MAX + 1] = {
 	[WGALLOWEDIP_A_FAMILY]		= { .type = NLA_U16 },
-	[WGALLOWEDIP_A_IPADDR]		= NLA_POLICY_MIN_LEN(sizeof(struct in_addr)),
+	[WGALLOWEDIP_A_IPADDR]		= { .len = sizeof(struct in_addr) },
 	[WGALLOWEDIP_A_CIDR_MASK]	= { .type = NLA_U8 }
 };
 
@@ -119,7 +125,7 @@ get_peer(struct wg_peer *peer, struct sk_buff *skb, struct dump_ctx *ctx)
 		goto err;
 
 	if (!allowedips_node) {
-		const struct __kernel_timespec last_handshake = {
+		const struct __uapi_kernel_timespec last_handshake = {
 			.tv_sec = peer->walltime_last_handshake.tv_sec,
 			.tv_nsec = peer->walltime_last_handshake.tv_nsec
 		};
@@ -196,9 +202,15 @@ err:
 
 static int wg_get_device_start(struct netlink_callback *cb)
 {
+	struct nlattr **attrs = genl_family_attrbuf(&genl_family);
 	struct wg_device *wg;
+	int ret;
 
-	wg = lookup_interface(genl_dumpit_info(cb)->attrs, cb->skb);
+	ret = nlmsg_parse(cb->nlh, GENL_HDRLEN + genl_family.hdrsize, attrs,
+			  genl_family.maxattr, device_policy, NULL);
+	if (ret < 0)
+		return ret;
+	wg = lookup_interface(attrs, cb->skb);
 	if (IS_ERR(wg))
 		return PTR_ERR(wg);
 	DUMP_CTX(cb)->wg = wg;
@@ -602,48 +614,29 @@ out_nodev:
 	return ret;
 }
 
-#ifndef COMPAT_CANNOT_USE_CONST_GENL_OPS
-static const
-#else
-static
-#endif
-struct genl_ops genl_ops[] = {
+static const struct genl_ops genl_ops[] = {
 	{
 		.cmd = WG_CMD_GET_DEVICE,
-#ifndef COMPAT_CANNOT_USE_NETLINK_START
 		.start = wg_get_device_start,
-#endif
 		.dumpit = wg_get_device_dump,
 		.done = wg_get_device_done,
-#ifdef COMPAT_CANNOT_INDIVIDUAL_NETLINK_OPS_POLICY
-		.policy = device_policy,
-#endif
-		.flags = GENL_UNS_ADMIN_PERM
+		.flags = GENL_UNS_ADMIN_PERM,
+		.policy = device_policy
 	}, {
 		.cmd = WG_CMD_SET_DEVICE,
 		.doit = wg_set_device,
-#ifdef COMPAT_CANNOT_INDIVIDUAL_NETLINK_OPS_POLICY
-		.policy = device_policy,
-#endif
-		.flags = GENL_UNS_ADMIN_PERM
+		.flags = GENL_UNS_ADMIN_PERM,
+		.policy = device_policy
 	}
 };
 
-static struct genl_family genl_family
-#ifndef COMPAT_CANNOT_USE_GENL_NOPS
-__ro_after_init = {
+static struct genl_family genl_family __ro_after_init = {
 	.ops = genl_ops,
 	.n_ops = ARRAY_SIZE(genl_ops),
-#else
-= {
-#endif
 	.name = WG_GENL_NAME,
 	.version = WG_GENL_VERSION,
 	.maxattr = WGDEVICE_A_MAX,
 	.module = THIS_MODULE,
-#ifndef COMPAT_CANNOT_INDIVIDUAL_NETLINK_OPS_POLICY
-	.policy = device_policy,
-#endif
 	.netnsok = true
 };
 

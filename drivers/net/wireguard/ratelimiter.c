@@ -3,18 +3,6 @@
  * Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  */
 
-#ifdef COMPAT_CANNOT_DEPRECIATE_BH_RCU
-/* We normally alias all non-_bh functions to the _bh ones in the compat layer,
- * but that's not appropriate here, where we actually do want non-_bh ones.
- */
-#undef synchronize_rcu
-#define synchronize_rcu old_synchronize_rcu
-#undef call_rcu
-#define call_rcu old_call_rcu
-#undef rcu_barrier
-#define rcu_barrier old_rcu_barrier
-#endif
-
 #include "ratelimiter.h"
 #include <linux/siphash.h>
 #include <linux/mm.h>
@@ -182,18 +170,18 @@ int wg_ratelimiter_init(void)
 	 * we borrow their wisdom about good table sizes on different systems
 	 * dependent on RAM. This calculation here comes from there.
 	 */
-	table_size = (totalram_pages() > (1U << 30) / PAGE_SIZE) ? 8192 :
+	table_size = (totalram_pages > (1U << 30) / PAGE_SIZE) ? 8192 :
 		max_t(unsigned long, 16, roundup_pow_of_two(
-			(totalram_pages() << PAGE_SHIFT) /
+			(totalram_pages << PAGE_SHIFT) /
 			(1U << 14) / sizeof(struct hlist_head)));
 	max_entries = table_size * 8;
 
-	table_v4 = kvcalloc(table_size, sizeof(*table_v4), GFP_KERNEL);
+	table_v4 = kvzalloc(table_size * sizeof(*table_v4), GFP_KERNEL);
 	if (unlikely(!table_v4))
 		goto err_kmemcache;
 
 #if IS_ENABLED(CONFIG_IPV6)
-	table_v6 = kvcalloc(table_size, sizeof(*table_v6), GFP_KERNEL);
+	table_v6 = kvzalloc(table_size * sizeof(*table_v6), GFP_KERNEL);
 	if (unlikely(!table_v6)) {
 		kvfree(table_v4);
 		goto err_kmemcache;
