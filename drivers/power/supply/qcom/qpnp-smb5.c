@@ -874,6 +874,11 @@ static enum power_supply_property smb5_usb_props[] = {
 	POWER_SUPPLY_PROP_CTM_CURRENT_MAX,
 	POWER_SUPPLY_PROP_HW_CURRENT_MAX,
 	POWER_SUPPLY_PROP_REAL_TYPE,
+#ifdef CONFIG_SPINEL_CHARGER
+	POWER_SUPPLY_PROP_ADAPTER_TYPE,
+	POWER_SUPPLY_PROP_FORCE_5V,
+	POWER_SUPPLY_PROP_ENABLE_SW_TERM,
+#endif
 	POWER_SUPPLY_PROP_PD_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_PD_VOLTAGE_MIN,
 	POWER_SUPPLY_PROP_CONNECTOR_TYPE,
@@ -942,6 +947,21 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_REAL_TYPE:
 		val->intval = chg->real_charger_type;
 		break;
+#ifdef CONFIG_SPINEL_CHARGER
+	case POWER_SUPPLY_PROP_ADAPTER_TYPE:
+		if (chg->real_charger_type == POWER_SUPPLY_TYPE_USB_PD ||
+		    chg->real_charger_type == POWER_SUPPLY_TYPE_USB_HVDCP ||
+		    chg->real_charger_type == POWER_SUPPLY_TYPE_USB_HVDCP_3)
+			val->intval = 1;
+		else if (chg->real_charger_type == POWER_SUPPLY_TYPE_USB_FLOAT)
+			val->intval = 2;
+		else
+			val->intval = 0;
+		break;
+	case POWER_SUPPLY_PROP_ENABLE_SW_TERM:
+		val->intval = smblib_read_sw_term(chg);
+		break;
+#endif
 	case POWER_SUPPLY_PROP_TYPEC_MODE:
 		rc = smblib_get_usb_prop_typec_mode(chg, val);
 		break;
@@ -1162,6 +1182,15 @@ static int smb5_usb_set_prop(struct power_supply *psy,
 		chg->apsd_ext_timeout = false;
 		smblib_rerun_apsd_if_required(chg);
 		break;
+#ifdef CONFIG_SPINEL_CHARGER
+	case POWER_SUPPLY_PROP_FORCE_5V:
+		if (val->intval)
+			rc = smblib_force_vbus_voltage(chg, FORCE_5V_BIT);
+		break;
+	case POWER_SUPPLY_PROP_ENABLE_SW_TERM:
+		rc = smblib_enable_sw_term(chg, val->intval);
+		break;
+#endif
 	case POWER_SUPPLY_PROP_CP_ENABLE:
 		smblib_set_smb_en(chg, val->intval);
 		break;
@@ -1182,6 +1211,10 @@ static int smb5_usb_prop_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CONNECTOR_HEALTH:
 	case POWER_SUPPLY_PROP_THERM_ICL_LIMIT:
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_LIMIT:
+#ifdef CONFIG_SPINEL_CHARGER
+	case POWER_SUPPLY_PROP_FORCE_5V:
+	case POWER_SUPPLY_PROP_ENABLE_SW_TERM:
+#endif
 	case POWER_SUPPLY_PROP_ADAPTER_CC_MODE:
 	case POWER_SUPPLY_PROP_APSD_RERUN:
 		return 1;
@@ -1752,6 +1785,13 @@ static enum power_supply_property smb5_batt_props[] = {
 	POWER_SUPPLY_PROP_TIME_TO_FULL_NOW,
 	POWER_SUPPLY_PROP_FCC_STEPPER_ENABLE,
 	POWER_SUPPLY_PROP_CHARGING_ENABLED,
+#ifdef CONFIG_SPINEL_CHARGER
+	POWER_SUPPLY_PROP_MAIN_CHARGE_INFO,
+	POWER_SUPPLY_PROP_CHARGE_DISABLE,
+	POWER_SUPPLY_PROP_BM_ENABLE,
+	POWER_SUPPLY_PROP_BM2_ENABLE,
+	POWER_SUPPLY_PROP_BP_ENABLE,
+#endif
 };
 
 #define DEBUG_ACCESSORY_TEMP_DECIDEGC	250
@@ -1911,6 +1951,20 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_RECHARGE_MV:
 		val->intval = chg->recharge_mv;
 		break;
+#ifdef CONFIG_SPINEL_CHARGER
+	case POWER_SUPPLY_PROP_MAIN_CHARGE_INFO:
+		val->intval = POWER_SUPPLY_MAIN_CHARGEIC;
+		break;
+	case POWER_SUPPLY_PROP_BM_ENABLE:
+		val->intval = chg->bm_enable;
+		break;
+	case POWER_SUPPLY_PROP_BM2_ENABLE:
+		val->intval = chg->bm2_enable;
+		break;
+	case POWER_SUPPLY_PROP_BP_ENABLE:
+		val->intval = chg->bp_enable;
+		break;
+#endif
 	default:
 		pr_err("batt power supply prop %d not supported\n", psp);
 		return -EINVAL;
@@ -2050,6 +2104,32 @@ static int smb5_batt_set_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
 		rc = smblib_set_prop_batt_iterm(chg, val);
 		break;
+#ifdef CONFIG_SPINEL_CHARGER
+	case POWER_SUPPLY_PROP_CHARGE_DISABLE:
+		rc = smblib_set_prop_charge_disable(chg, val);
+		break;
+	case POWER_SUPPLY_PROP_BM_ENABLE:
+		chg->bm_enable = !!val->intval;
+		if (chg->bm_enable)
+			queue_delayed_work(system_power_efficient_wq,
+					   &chg->battery_maintain_work,
+					   125);
+		break;
+	case POWER_SUPPLY_PROP_BM2_ENABLE:
+		chg->bm2_enable = !!val->intval;
+		if (chg->bm2_enable)
+			queue_delayed_work(system_power_efficient_wq,
+					   &chg->battery_maintain_work,
+					   125);
+		break;
+	case POWER_SUPPLY_PROP_BP_ENABLE:
+		chg->bp_enable = !!val->intval;
+		if (chg->bp_enable)
+			queue_delayed_work(system_power_efficient_wq,
+					   &chg->battery_protect_work,
+					   125);
+		break;
+#endif
 
 	default:
 		rc = -EINVAL;
@@ -2072,6 +2152,12 @@ static int smb5_batt_prop_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMITED:
 	case POWER_SUPPLY_PROP_STEP_CHARGING_ENABLED:
 	case POWER_SUPPLY_PROP_DIE_HEALTH:
+#ifdef CONFIG_SPINEL_CHARGER
+	case POWER_SUPPLY_PROP_CHARGE_DISABLE:
+	case POWER_SUPPLY_PROP_BM_ENABLE:
+	case POWER_SUPPLY_PROP_BM2_ENABLE:
+	case POWER_SUPPLY_PROP_BP_ENABLE:
+#endif
 	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 	case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
 	case POWER_SUPPLY_PROP_RECHARGE_MV:

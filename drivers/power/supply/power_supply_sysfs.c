@@ -98,6 +98,12 @@ static const char * const power_supply_typec_src_rp_text[] = {
 	"Rp-Default", "Rp-1.5A", "Rp-3A"
 };
 
+#ifdef CONFIG_SPINEL_CHARGER
+static const char * const power_supply_chargeic_text[] = {
+	"Unknown", "pm8150", "smb1395b"
+};
+#endif
+
 static ssize_t power_supply_show_usb_type(struct device *dev,
 					  enum power_supply_usb_type *usb_types,
 					  ssize_t num_usb_types,
@@ -205,6 +211,16 @@ static ssize_t power_supply_show_property(struct device *dev,
 		ret = sprintf(buf, "%s\n",
 			      power_supply_typec_src_rp_text[value.intval]);
 		break;
+#ifdef CONFIG_SPINEL_CHARGER
+	case POWER_SUPPLY_PROP_MAIN_CHARGE_INFO:
+	case POWER_SUPPLY_PROP_SLAVE_CHARGE_INFO:
+		if (value.intval < 0 ||
+		    value.intval >= ARRAY_SIZE(power_supply_chargeic_text))
+			return -EINVAL;
+		ret = sprintf(buf, "%s\n",
+			      power_supply_chargeic_text[value.intval]);
+		break;
+#endif
 	case POWER_SUPPLY_PROP_DIE_HEALTH:
 	case POWER_SUPPLY_PROP_SKIN_HEALTH:
 	case POWER_SUPPLY_PROP_CONNECTOR_HEALTH:
@@ -484,6 +500,17 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(cp_toggle_switcher),
 	POWER_SUPPLY_ATTR(cp_irq_status),
 	POWER_SUPPLY_ATTR(cp_ilim),
+#ifdef CONFIG_SPINEL_CHARGER
+	POWER_SUPPLY_ATTR(main_charge_info),
+	POWER_SUPPLY_ATTR(slave_charge_info),
+	POWER_SUPPLY_ATTR(adapter_type),
+	POWER_SUPPLY_ATTR(charge_disable),
+	POWER_SUPPLY_ATTR(bm_enable),
+	POWER_SUPPLY_ATTR(bm2_enable),
+	POWER_SUPPLY_ATTR(bp_enable),
+	POWER_SUPPLY_ATTR(force_5v),
+	POWER_SUPPLY_ATTR(enable_sw_term),
+#endif
 	POWER_SUPPLY_ATTR(irq_status),
 	POWER_SUPPLY_ATTR(parallel_output_mode),
 	POWER_SUPPLY_ATTR(cc_toggle_enable),
@@ -518,6 +545,12 @@ static umode_t power_supply_attr_is_visible(struct kobject *kobj,
 		int property = psy->desc->properties[i];
 
 		if (property == attrno) {
+#ifdef CONFIG_SPINEL_CHARGER
+			if (property == POWER_SUPPLY_PROP_CHARGE_DISABLE ||
+			    property == POWER_SUPPLY_PROP_BM_ENABLE ||
+			    property == POWER_SUPPLY_PROP_BM2_ENABLE)
+				return 0666;
+#endif
 			if (psy->desc->property_is_writeable &&
 			    psy->desc->property_is_writeable(psy, property) > 0)
 				mode |= S_IWUSR;
