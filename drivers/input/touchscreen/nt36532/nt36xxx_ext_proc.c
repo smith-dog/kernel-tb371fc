@@ -1453,34 +1453,43 @@ int32_t nvt_support_pen_set(uint8_t state, uint8_t version) {
 	mutex_unlock(&ts->lock);
 	return 0;
 }
-static ssize_t nvt_support_pen_store(struct file *file, const char *buffer, size_t count, loff_t *pos) {
-    int32_t tmp[4];
-    uint8_t ret;
-    char buf[16] = { 0 };
+static ssize_t nvt_support_pen_store(struct file *file, const char *buffer,
+                                     size_t count, loff_t *pos)
+{
+    int32_t tmp[2] = {0, 0};
+    int parsed, rc;
+    char buf[16] = {0};
 
-	ret = copy_from_user(buf, (uint8_t *) buffer, count);
-	if (ret)
-		return -EINVAL;
+    /* The GSI historically writes only 1. Never use uninitialized
+     * pen version or copy beyond this stack buffer. Single-field
+     * requests retain the current OEM pen generation.
+     */
+    if (!count || count >= sizeof(buf))
+        return -EINVAL;
+    if (copy_from_user(buf, buffer, count))
+        return -EFAULT;
 
-	NVT_LOG("buf=%s\n", buf);
+    parsed = sscanf(buf, "%d,%d", &tmp[0], &tmp[1]);
+    if (parsed != 1 && parsed != 2)
+        return -EINVAL;
+    if (parsed == 1)
+        tmp[1] = ts->pen_version;
+    if ((tmp[0] != 0 && tmp[0] != 1) ||
+        (tmp[1] != 0 && tmp[1] != 1))
+        return -EINVAL;
 
-/*Spinel code for open old pen by zhangyd22 at 2023/04/011 star*/
-	ret = sscanf(buf, "%d,%d", tmp, tmp+1);
-	ts->pen_state = tmp[0];
-	ts->pen_version = tmp[1];
-
-	NVT_LOG("support pen state %d, %d!\n", ts->pen_state, ts->pen_version);
-/*Spinel code for control pen state by zhangyd22 at 2023/04/04 start*/
-	if (ts->nfc_state) {
-		NVT_LOG("The pen is chargering!");
-	} else {
-		NVT_LOG("The pen is ready!");
-		nvt_support_pen_set(ts->pen_state, ts->pen_version);
-	}
-/*Spinel code for control pen state by zhangyd22 at 2023/04/04 end*/
-/*Spinel code for open old pen by zhangyd22 at 2023/04/11 end*/
-
-	return count;
+    if (!ts->nfc_state) {
+        rc = nvt_support_pen_set(tmp[0], tmp[1]);
+        if (rc)
+            return rc;
+    } else {
+        NVT_LOG("Pen command deferred while NFC charging\n");
+    }
+    ts->pen_state = tmp[0];
+    ts->pen_version = tmp[1];
+    NVT_LOG("support pen state %d, version %d\n", ts->pen_state,
+            ts->pen_version);
+    return count;
 }
 static int nvt_support_pen_show(struct seq_file *sfile, void *v) {
 	seq_printf(sfile, "Pen state %d!\n", ts->pen_state);
