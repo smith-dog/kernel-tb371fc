@@ -2356,7 +2356,7 @@ static int nvt_charger_notifier_callback(struct notifier_block *nb,unsigned long
 		return -EINVAL;
 	}
 	if (!strcmp(psy->desc->name, "usb")) {
-		if (psy && ts && val == POWER_SUPPLY_PROP_STATUS) {
+		if (psy && ts && (val == POWER_SUPPLY_PROP_STATUS || val == POWER_SUPPLY_PROP_PRESENT || val == POWER_SUPPLY_PROP_ONLINE || val == 0)) {
 			ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT, &prop);
 			if (ret < 0) {
 				NVT_ERR("Couldn't get POWER_SUPPLY_PROP_PRESENT rc=%d\n", ret);
@@ -2870,8 +2870,11 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 #if NVT_CUST_PROC_CMD
 	ts->edge_reject_state = 0;
 	ts->game_mode_state = 0;
-	ts->pen_state = 0;
-	ts->pen_version = 0;
+	/* TASK-042: pen defaults on (new-pen protocol). Stock probes with
+	 * 0,0 and waits for userspace; arming here removes the boot-window
+	 * dependency on the Lenovo pen unlock properties. */
+	ts->pen_state = 1;
+	ts->pen_version = 1;
 /* Spinel code for OSPINEL-2020 by zhangyd22 at 2023/4/4 start */
 #if NVT_DPR_SWITCH
 	ts->fw_pen_state = 0;

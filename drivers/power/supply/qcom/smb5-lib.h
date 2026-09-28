@@ -475,6 +475,10 @@ struct smb_charger {
 	struct work_struct	chg_termination_work;
 	struct work_struct	dcin_aicl_work;
 	struct work_struct	cp_status_change_work;
+#ifdef CONFIG_SPINEL_CHARGER
+	struct delayed_work	battery_maintain_work;
+	struct delayed_work	battery_protect_work;
+#endif
 	struct delayed_work	ps_change_timeout_work;
 	struct delayed_work	clear_hdc_work;
 	struct delayed_work	icl_change_work;
@@ -532,6 +536,11 @@ struct smb_charger {
 	int			fake_capacity;
 	int			fake_batt_status;
 	bool			step_chg_enabled;
+#ifdef CONFIG_SPINEL_CHARGER
+	bool			bm_enable;
+	bool			bm2_enable;
+	bool			bp_enable;
+#endif
 	bool			sw_jeita_enabled;
 	bool			jeita_arb_enable;
 	bool			typec_legacy_use_rp_icl;
@@ -736,6 +745,12 @@ int smblib_set_prop_batt_iterm(struct smb_charger *chg,
 				const union power_supply_propval *val);
 int smblib_set_prop_input_suspend(struct smb_charger *chg,
 				const union power_supply_propval *val);
+#ifdef CONFIG_SPINEL_CHARGER
+int smblib_set_prop_charge_disable(struct smb_charger *chg,
+				const union power_supply_propval *val);
+int smblib_enable_sw_term(struct smb_charger *chg, bool enable);
+int smblib_read_sw_term(struct smb_charger *chg);
+#endif
 int smblib_set_prop_batt_capacity(struct smb_charger *chg,
 				const union power_supply_propval *val);
 int smblib_set_prop_batt_status(struct smb_charger *chg,
