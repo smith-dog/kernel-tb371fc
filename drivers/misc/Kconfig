@@ -689,3 +689,13 @@ config HW_BOARD_ID_ROW_PRC
 	    depends on HW_BOOT_INFO
 	    help
 	      Enable Feature for HW Board with ID_ROW_PRC
+config NTSYNC
+	tristate "NT synchronization primitive emulation"
+	help
+	  This module provides kernel support for emulation of Windows NT
+	  synchronization primitives. It is not a hardware driver.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ntsync.
+
+	  If unsure, say N.

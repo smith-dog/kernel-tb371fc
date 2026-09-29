@@ -730,3 +730,5 @@ CONFIG_EXTRA_FIRMWARE_DIR="/home/smith/t34/fw"
 # p258: data-kernel rmnet perf/shs built-in
 CONFIG_RMNET_PERF=y
 CONFIG_RMNET_SHS=y
+# p273: TASK-044 - ntsync (Windows NT sync primitive emulation, Wine/Proton userspace)
+CONFIG_NTSYNC=y
