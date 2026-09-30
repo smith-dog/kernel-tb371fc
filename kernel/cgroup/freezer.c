@@ -193,7 +193,6 @@ static void frozen_reclaim_worker(struct work_struct *work)
 	struct task_struct *task = fw->task;
 	struct sched_param param = { .sched_priority = 0 };
 
-	pr_emerg("fzr: worker enter task=%d\n", task->pid);
 
 	/*
 	 * SCHED_IDLE: every UI/application thread preempts the drain; it
@@ -201,7 +200,6 @@ static void frozen_reclaim_worker(struct work_struct *work)
 	 * the single-threaded frozen_reclaim_wq.
 	 */
 	sched_setscheduler_nocheck(current, SCHED_IDLE, &param);
-	pr_emerg("fzr: SCHED_IDLE set\n");
 
 	/*
 	 * Skip if the task unfroze before the delay elapsed; reclaiming a
@@ -211,9 +209,7 @@ static void frozen_reclaim_worker(struct work_struct *work)
 	if (!task->frozen)
 		goto out;
 
-	pr_emerg("fzr: reclaim begin task=%d\n", task->pid);
 	reclaim_task_anon(task, INT_MAX);
-	pr_emerg("fzr: reclaim done task=%d\n", task->pid);
 out:
 	put_task_struct(task);
 	kfree(fw);
@@ -259,7 +255,6 @@ static void queue_frozen_reclaim(struct task_struct *task)
 	get_task_struct(task);
 	fw->task = task;
 	queue_delayed_work(frozen_reclaim_wq, &fw->dwork, HZ);
-	pr_emerg("fzr: queued task=%d\n", task->pid);
 }
 static int __init frozen_reclaim_wq_init(void)
 {

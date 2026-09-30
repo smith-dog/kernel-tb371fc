@@ -1572,7 +1572,6 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
 unsigned long reclaim_pages_from_list(struct list_head *page_list,
 					struct vm_area_struct *vma)
 {
-	pr_info("fzrpl: enter\n");
 	struct scan_control sc = {
 		.gfp_mask = GFP_KERNEL,
 		.priority = DEF_PRIORITY,
