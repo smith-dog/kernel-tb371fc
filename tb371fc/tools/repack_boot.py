@@ -71,6 +71,10 @@ def main() -> None:
 
     hdr = bytearray(stock[:page])
     hdr[8:12] = struct.pack("<I", len(kernel))
+    # TASK-050: header dtb_size must cover the FULL appended DTB tail. The stock
+    # Lenovo header undercounts by 364 bytes (1609107 vs 1609471), which truncates
+    # the last DTB for magiskboot/dtc readers and breaks konabess tools.
+    hdr[1648:1652] = struct.pack("<I", len(tail))
     if ramdisk_override and len(ramdisk) != rs:
         # 新 ramdisk 与原版尺寸不同：同步头部 ramdisk 大小并按新尺寸计算偏移/填充
         hdr[16:20] = struct.pack("<I", len(ramdisk))
