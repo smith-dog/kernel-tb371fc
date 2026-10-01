@@ -877,7 +877,17 @@ static int hm_d_revalidate_ref(struct dentry *dentry, unsigned int flags, bool w
         cond_resched();
     }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
     ret = hm_d_revalidate_common(d_inode(parent), &name.name, dentry, flags, weak);
+#else
+    /* TASK-049 (4.19): name_snapshot.name is `const char *` here (qstr only on
+     * 5.11+/6.2+). Upstream passes &name.name which lands as a garbage qstr on
+     * legacy kernels — silent dcache corruption. Build a real qstr instead. */
+    {
+        struct qstr qname = QSTR_INIT(name.name, strlen(name.name));
+        ret = hm_d_revalidate_common(d_inode(parent), &qname, dentry, flags, weak);
+    }
+#endif
     release_dentry_name_snapshot(&name);
     dput(parent);
     return ret;
