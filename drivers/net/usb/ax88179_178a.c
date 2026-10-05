@@ -1139,6 +1139,8 @@ static int ax88179_system_suspend(struct ax_device *axdev)
 	reg16 = AX_RX_CTL_STOP;
 	ax_write_cmd_nopm(axdev, AX_ACCESS_MAC, AX_RX_CTL, 2, 2, &reg16);
 
+	netdev_info(dev->net, "ax88179 - Link status is: 1\n");
+
 	return 0;
 }
 
