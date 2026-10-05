@@ -1000,15 +1000,15 @@ int elevator_init_mq(struct request_queue *q)
 	WARN_ON_ONCE(test_bit(QUEUE_FLAG_REGISTERED, &q->queue_flags));
 
 	if (unlikely(q->elevator))
-		goto out_unlock;
+		goto out;
 	if (IS_ENABLED(CONFIG_IOSCHED_BFQ)) {
 		e = elevator_get(q, "bfq", false);
 		if (!e)
-			goto out_unlock;
+			goto out;
 	} else {
 		e = elevator_get(q, "mq-deadline", false);
 		if (!e)
-			goto out_unlock;
+			goto out;
 	}
 	err = blk_mq_init_sched(q, e);
 	if (err)

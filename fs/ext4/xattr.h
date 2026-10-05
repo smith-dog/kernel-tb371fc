@@ -188,6 +188,10 @@ extern int ext4_xattr_delete_inode(handle_t *handle, struct inode *inode,
 				   int extra_credits);
 extern void ext4_xattr_inode_array_free(struct ext4_xattr_inode_array *array);
 
+extern int ext4_xattr_ibody_inline_set(handle_t *handle, struct inode *inode,
+				       struct ext4_xattr_info *i,
+				       struct ext4_xattr_ibody_find *is);
+
 extern int ext4_expand_extra_isize_ea(struct inode *inode, int new_extra_isize,
 			    struct ext4_inode *raw_inode, handle_t *handle);
 extern void ext4_evict_ea_inode(struct inode *inode);

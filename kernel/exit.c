@@ -5,6 +5,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/mmap_lock.h>
 #include <linux/slab.h>
 #include <linux/sched/autogroup.h>
 #include <linux/sched/mm.h>
@@ -67,7 +68,6 @@
 
 #include <linux/uaccess.h>
 #include <asm/unistd.h>
-#include <linux/pgtable.h>
 #include <asm/mmu_context.h>
 
 /*

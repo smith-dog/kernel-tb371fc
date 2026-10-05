@@ -55,6 +55,15 @@
 /* huaqin add for SD card bringup by liufurong at 20190201 start */
 #ifdef CONFIG_MMC_SDHCI_BH201
 #include "../host/sdhci-msm.h"
+
+/*
+ * QC eMMC bkops helper; device storage is UFS, eMMC bkops inactive.
+ */
+static inline int mmc_card_doing_bkops(struct mmc_card *card)
+{
+	return 0;
+}
+
 #else
 #define SDHCI_TIMEOUT_CONTROL	0x2E
 #endif

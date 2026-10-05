@@ -839,6 +839,8 @@
 		INIT_CALLS_LEVEL(7)					\
 		__initcall_end = .;
 
+#define SECURITY_INITCALL								__security_initcall_start = .;						KEEP(*(.security_initcall.init))					__security_initcall_end = .;
+
 #define CON_INITCALL							\
 		__con_initcall_start = .;				\
 		KEEP(*(.con_initcall.init))				\

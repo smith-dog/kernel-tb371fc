@@ -63,12 +63,6 @@ struct buffer_aux {
 	int hash_verified;
 };
 /*
- * While system shutdown, skip verity work for I/O error.
- */
-static inline bool verity_is_system_shutting_down(void)
-{
-	return system_state == SYSTEM_HALT || system_state == SYSTEM_POWER_OFF
-		|| system_state == SYSTEM_RESTART;
 }
 
 /*

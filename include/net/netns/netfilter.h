@@ -31,4 +31,3 @@ struct netns_nf {
 	bool			defrag_ipv6;
 #endif
 };
-#endif

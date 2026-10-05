@@ -667,7 +667,6 @@ asmlinkage __visible void __init start_kernel(void)
 	 * - add_latent_entropy() to get any latent entropy
 	 * - adding command line entropy
 	 */
-	rand_initialize();
 	add_latent_entropy();
 	add_device_randomness(command_line, strlen(command_line));
 	boot_init_stack_canary();
@@ -681,7 +680,6 @@ asmlinkage __visible void __init start_kernel(void)
 	 * - time_init() for making random_get_entropy() work on some platforms
 	 * - random_init() to initialize the RNG from from early entropy sources
 	 */
-	random_init(command_line);
 	boot_init_stack_canary();
 
 	perf_event_init();

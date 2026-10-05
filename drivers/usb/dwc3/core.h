@@ -394,6 +394,9 @@
 
 /* Global User Control Register 3 */
 #define DWC3_GUCTL3_USB20_RETRY_DISABLE		BIT(16)
+
+/* Global User Control Register */
+#define DWC3_GUCTL_HSTINAUTORETRY	BIT(14)
 #define DWC3_GUCTL3_SPLITDISABLE		BIT(14)
 
 /* Device Configuration Register */
@@ -1678,4 +1681,25 @@ extern void dwc3_set_notifier(
 extern int dwc3_notify_event(struct dwc3 *dwc3, unsigned int event,
 						unsigned int value);
 void dwc3_usb3_phy_suspend(struct dwc3 *dwc, int suspend);
+/* power management interface */
+#if !IS_ENABLED(CONFIG_USB_DWC3_HOST)
+int dwc3_gadget_suspend(struct dwc3 *dwc);
+int dwc3_gadget_resume(struct dwc3 *dwc);
+void dwc3_gadget_process_pending_events(struct dwc3 *dwc);
+#else
+static inline int dwc3_gadget_suspend(struct dwc3 *dwc)
+{
+	return 0;
+}
+
+static inline int dwc3_gadget_resume(struct dwc3 *dwc)
+{
+	return 0;
+}
+
+static inline void dwc3_gadget_process_pending_events(struct dwc3 *dwc)
+{
+}
+#endif /* !IS_ENABLED(CONFIG_USB_DWC3_HOST) */
+
 #endif /* __DRIVERS_USB_DWC3_CORE_H */

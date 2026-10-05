@@ -505,6 +505,11 @@ extern void sysrq_timer_list_show(void);
 
 int hrtimers_prepare_cpu(unsigned int cpu);
 #ifdef CONFIG_HOTPLUG_CPU
+int hrtimers_dead_cpu(unsigned int cpu);
+#else
+#define hrtimers_dead_cpu	NULL
+#endif
+#ifdef CONFIG_HOTPLUG_CPU
 int hrtimers_cpu_dying(unsigned int cpu);
 #else
 #define hrtimers_cpu_dying	NULL

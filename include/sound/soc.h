@@ -1165,7 +1165,6 @@ struct snd_soc_card {
 
 	void *drvdata;
 
-	spinlock_t dpcm_lock;
 };
 
 /* SoC machine DAI configuration, glues a codec and cpu DAI together */
