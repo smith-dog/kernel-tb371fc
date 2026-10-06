@@ -270,13 +270,29 @@ static bool klog_validate(struct block_device *b)
 	return cap_ok && sect_ok;
 }
 
+/* Claim one dev_t and put it through the identity gate. */
+static bool klog_claim(dev_t dev, struct block_device **out)
+{
+	struct block_device *b = blkdev_get_by_dev(dev, FMODE_READ | FMODE_WRITE,
+						   klog_holder);
+
+	if (IS_ERR(b))
+		return false;
+	if (!klog_validate(b)) {
+		blkdev_put(b, FMODE_READ | FMODE_WRITE);
+		return false;
+	}
+	*out = b;
+	return true;
+}
+
 #ifndef MODULE
 
 static int klog_probe_dev(struct device *dev, void *data)
 {
 	struct block_device **hit = data;
 	struct gendisk *disk;
-	struct block_device *b;
+	dev_t cand;
 
 	/*
 	 * block_class holds partitions too, whose parent is the disk device.
@@ -287,26 +303,35 @@ static int klog_probe_dev(struct device *dev, void *data)
 	if (dev->parent && dev->parent->class == &block_class)
 		return 0;
 	disk = dev_to_disk(dev);
-	if (!disk || get_capacity(disk) != (sector_t)(KLOG_LU_BYTES >> 9))
+	if (!disk)
 		return 0;
-	b = blkdev_get_by_dev(MKDEV(disk->major, disk->first_minor),
-			      FMODE_READ | FMODE_WRITE, klog_holder);
-	if (IS_ERR(b))
+	cand = MKDEV(disk->major, disk->first_minor);
+	if (!klog_claim(cand, hit))
 		return 0;
-	if (!klog_validate(b)) {
-		blkdev_put(b, FMODE_READ | FMODE_WRITE);
-		return 0;
-	}
-	pr_info("kmsg_tb371_log: LU found %s (%d:%d), LBA %llu reserved\n",
-		disk->disk_name, MAJOR(b->bd_dev), MINOR(b->bd_dev), KLOG_BASE_LBA);
-	*hit = b;
+	pr_info("kmsg_tb371_log: LU %s (%d:%d) claimed by class walk\n",
+		disk->disk_name, MAJOR(cand), MINOR(cand));
 	return 1;
 }
 
+/*
+ * Built-in form: try the dev_t the .ko positive control already proved on this
+ * board first, so the treatment exercises exactly the code path the control
+ * validated; the class walk stays as the fallback if sd enumerates differently.
+ * Every candidate still passes klog_validate(), so a wrong dev_t can only be
+ * rejected, never written to.
+ */
 static struct block_device *klog_find_lu(void)
 {
+	static const dev_t probes[] = { MKDEV(8, 64), MKDEV(8, 32), MKDEV(8, 40) };
 	struct block_device *b = NULL;
+	int i;
 
+	for (i = 0; i < ARRAY_SIZE(probes); i++)
+		if (klog_claim(probes[i], &b)) {
+			pr_info("kmsg_tb371_log: LU claimed by dev_t %d:%d\n",
+				MAJOR(probes[i]), MINOR(probes[i]));
+			return b;
+		}
 	class_for_each_device(&block_class, NULL, &b, klog_probe_dev);
 	return b;
 }
@@ -319,22 +344,17 @@ MODULE_PARM_DESC(devnode, "major:minor of the UFS LU holding the landing zone");
 
 static struct block_device *klog_find_lu(void)
 {
-	struct block_device *b;
+	struct block_device *b = NULL;
 	unsigned int maj, min;
 
 	if (sscanf(devnode, "%u:%u", &maj, &min) != 2)
 		return NULL;
-	b = blkdev_get_by_dev(MKDEV(maj, min), FMODE_READ | FMODE_WRITE, klog_holder);
-	if (IS_ERR(b))
-		return NULL;
-	if (!klog_validate(b)) {
-		pr_err("kmsg_tb371_log: %u:%u failed the landing-zone identity gate\n",
+	if (!klog_claim(MKDEV(maj, min), &b)) {
+		pr_err("kmsg_tb371_log: %u:%u is not the landing LU (or is busy)\n",
 		       maj, min);
-		blkdev_put(b, FMODE_READ | FMODE_WRITE);
 		return NULL;
 	}
-	pr_info("kmsg_tb371_log: LU found %u:%u, LBA %llu reserved\n", maj, min,
-		KLOG_BASE_LBA);
+	pr_info("kmsg_tb371_log: LU claimed via devnode param %u:%u\n", maj, min);
 	return b;
 }
 #endif
