@@ -370,9 +370,14 @@ static int klog_open(void)
 		return -ENODEV;
 
 	boot_count = 0;
-	if (!klog_read(KLOG_BASE_LBA) && ix->magic == KLOG_MAGIC)
-		boot_count = ix->boot_count + 1;
 	seq = 0;
+	if (!klog_read(KLOG_BASE_LBA) && ix->magic == KLOG_MAGIC) {
+		boot_count = ix->boot_count + 1;
+		/* Continue the cursor where the previous boot left off: a fresh boot
+		 * must not erase the dead kernel's last records.
+		 */
+		seq = ix->seq;
+	}
 
 	dumper.dump = klog_panic_dump;
 	dumper.max_reason = KMSG_DUMP_PANIC;
@@ -442,7 +447,15 @@ static void __exit kmsg_tb371_log_exit(void)
 	kfree(tailbuf);
 }
 
+#ifdef MODULE
 module_init(kmsg_tb371_log_init);
 module_exit(kmsg_tb371_log_exit);
+#else
+/* initcall level 0 instead of device_initcall: the retry loop should be running
+ * before driver probe, so a kernel that dies later in boot still leaves its
+ * log_buf tail on storage.
+ */
+early_initcall(kmsg_tb371_log_init);
+#endif
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("TB371FC printk flight recorder on the UFS logdump area");
