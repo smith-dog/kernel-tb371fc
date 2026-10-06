@@ -189,7 +189,7 @@ static int klog_open(void)
 	char banner[320];
 	int n;
 
-	f = filp_open(KLOG_DEV, O_RDWR | O_DIRECT, 0);
+	f = filp_open(KLOG_DEV, O_RDWR | O_SYNC, 0);
 	if (IS_ERR(f))
 		return PTR_ERR(f);
 	devfile = f;
