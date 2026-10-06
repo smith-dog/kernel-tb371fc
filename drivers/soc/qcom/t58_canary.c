@@ -14,7 +14,10 @@
  *
  * Timers, not kthreads: #220 showed a worker created at initcall level 0 could
  * vanish for reasons still unpinned, and a kthread here would make "no cycle"
- * ambiguous. emergency_restart() neither syncs nor touches the console, so it
+ * ambiguous. The timers must NOT be deferrable: on an idle or NOHZ CPU a
+ * deferrable timer can be postponed indefinitely, so a merely parked machine
+ * would fake a "never reached this level" reading - that mistake voided round A.
+ * emergency_restart() neither syncs nor touches the console, so it
  * still works when storage and the slow paths are gone.
  *
  * Dev-branch diagnostic asset (AGENTS 8.4); must be off in releases.
@@ -43,7 +46,7 @@ static void fire(struct timer_list *t)
 
 static void __init arm(struct rung *rung)
 {
-	timer_setup(&rung->t, fire, TIMER_DEFERRABLE);
+	timer_setup(&rung->t, fire, 0);
 	rung->t.expires = jiffies + msecs_to_jiffies(rung->delay_s * MSEC_PER_SEC);
 	add_timer(&rung->t);
 	pr_info("rung %s armed (%u s)\n", rung->name, rung->delay_s);
