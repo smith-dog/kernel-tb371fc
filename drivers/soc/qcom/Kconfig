@@ -981,4 +981,13 @@ config ICNSS_QMI
 	  and configurations. It also send WLAN on/off control message to FW
 	  over QMI channel.
 
+config KMSG_TB371_LOG
+	bool "TB371FC printk flight recorder on the UFS logdump area"
+	default y
+	help
+	  Copies the tail of log_buf into the raw UFS 'logdump' area (LU4,
+	  LBA 344177..) once a second and once on panic, so a hung or bricked
+	  boot can still be read out over EDL firehose <read> via QFIL.
+	  Permanent dev-branch diagnostic asset; keep enabled in dev builds.
+
 source "drivers/soc/qcom/wcnss/Kconfig"
