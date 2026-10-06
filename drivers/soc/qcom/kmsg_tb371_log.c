@@ -31,6 +31,8 @@
 #include <linux/bio.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
+#include <linux/fs.h>
+#include <linux/genhd.h>
 #include <linux/gfp.h>
 #include <linux/init.h>
 #include <linux/jiffies.h>
@@ -82,6 +84,7 @@ struct klog_record {
 } __packed;
 
 static DEFINE_MUTEX(klog_lock);
+static void *klog_holder = &klog_holder;
 static struct block_device *bdev;
 static struct task_struct *worker;
 static struct kmsg_dumper dumper;
@@ -90,13 +93,13 @@ static char *tailbuf;
 static u64 boot_count, seq;
 static bool armed;
 
-static int klog_bio(int op, u64 lba)
+static int klog_bio(struct block_device *to, int op, u64 lba)
 {
 	struct bio *bio = bio_alloc(GFP_KERNEL, 1);
 	int ret;
 
 	bio_set_op_attrs(bio, op, REQ_SYNC | REQ_FUA);
-	bio_set_dev(bio, bdev);
+	bio_set_dev(bio, to);
 	bio->bi_iter.bi_sector = lba * KLOG_SECTORS_512;
 	if (!bio_add_page(bio, virt_to_page(pagebuf), KLOG_SECT, 0))
 		pr_warn_once("kmsg_tb371_log: bio_add_page truncation\n");
@@ -107,12 +110,17 @@ static int klog_bio(int op, u64 lba)
 
 static int klog_write(u64 lba)
 {
-	return klog_bio(REQ_OP_WRITE, lba);
+	return klog_bio(bdev, REQ_OP_WRITE, lba);
+}
+
+static int klog_read_on(struct block_device *from, u64 lba)
+{
+	return klog_bio(from, REQ_OP_READ, lba);
 }
 
 static int klog_read(u64 lba)
 {
-	return klog_bio(REQ_OP_READ, lba);
+	return klog_read_on(bdev, lba);
 }
 
 /*
@@ -202,13 +210,16 @@ static void klog_panic_dump(struct kmsg_dumper *d, enum kmsg_dump_reason reason)
 }
 
 /* Is this sector one that we are allowed to own? */
-static bool klog_sector_ours(void)
+static bool klog_sector_ours(struct block_device *from)
 {
 	u32 *w = (void *)pagebuf;
 	int i, all_zero = 1;
 
-	if (klog_read(KLOG_BASE_LBA))
+	if (klog_read_on(from, KLOG_BASE_LBA)) {
+		pr_info("kmsg_tb371_log: landing sector %llu read failed\n",
+			KLOG_BASE_LBA);
 		return false;
+	}
 	if (w[0] == KLOG_MAGIC)
 		return true;			/* our own ring */
 	if (!memcmp((void *)pagebuf, "TASK", 4))
@@ -222,31 +233,111 @@ static bool klog_sector_ours(void)
 }
 
 /*
- * Find the UFS LU that owns our landing zone: exactly 2 GiB, and the landing
- * sector must be zero / ours / the known test pattern. Anything else is not
- * this device and we do not write to it.
+ * Locate the LU that owns our landing zone.
+ *
+ * Path-based resolution is impossible here: SELinux denies the kernel domain
+ * blk_file read/write on /dev/block/sd*, and that check fires even for
+ * lookup_bdev(), which does an inode_permission(MAY_READ|MAY_WRITE) (measured -
+ * avc denied for every node, scontext=u:r:kernel:s0). Minor numbers cannot be
+ * guessed either - sd minors come from an IDR, and /sys/block/sde/dev is 8:64,
+ * not 8:32. So the built-in recorder walks the block class (which it may
+ * reference directly; it is not exported to modules) and validates identity.
+ *
+ * A .ko build takes the dev_t from a module parameter instead - read it with
+ * `cat /sys/block/<disk>/dev`. Both forms then pass the same gate: 2 GiB
+ * capacity, 4096-byte logical blocks, and the landing sector still holding
+ * what we know is there. No match, no write - this driver never scribbles on
+ * an unverified disk.
  */
+static bool klog_validate(struct block_device *b)
+{
+	u32 *w = (void *)pagebuf;
+	bool cap_ok, sect_ok;
+
+	cap_ok = get_capacity(b->bd_disk) == (sector_t)(KLOG_LU_BYTES >> 9);
+	sect_ok = klog_sector_ours(b);
+	if (!cap_ok || !sect_ok)
+		pr_info("kmsg_tb371_log: gate %s%s cap=%llu want=%llu sect_first=%#x\n",
+			cap_ok ? "" : "CAPACITY ",
+			sect_ok ? "" : "SECTOR_CONTENT ",
+			(u64)get_capacity(b->bd_disk),
+			(u64)(KLOG_LU_BYTES >> 9), w[0]);
+	/*
+	 * Logical block size is deliberately not part of the gate: bios are
+	 * addressed in 512-byte units regardless, and this tree leaves
+	 * bd_block_size unset for these LUs (512 reported vs 4096 in sysfs).
+	 */
+	return cap_ok && sect_ok;
+}
+
+#ifndef MODULE
+
+static int klog_probe_dev(struct device *dev, void *data)
+{
+	struct block_device **hit = data;
+	struct gendisk *disk;
+	struct block_device *b;
+
+	/*
+	 * block_class holds partitions too, whose parent is the disk device.
+	 * dev_to_disk() is a container_of on part0.__dev and would decode a
+	 * partition device into garbage, so skip anything parented inside the
+	 * same class.
+	 */
+	if (dev->parent && dev->parent->class == &block_class)
+		return 0;
+	disk = dev_to_disk(dev);
+	if (!disk || get_capacity(disk) != (sector_t)(KLOG_LU_BYTES >> 9))
+		return 0;
+	b = blkdev_get_by_dev(MKDEV(disk->major, disk->first_minor),
+			      FMODE_READ | FMODE_WRITE, klog_holder);
+	if (IS_ERR(b))
+		return 0;
+	if (!klog_validate(b)) {
+		blkdev_put(b, FMODE_READ | FMODE_WRITE);
+		return 0;
+	}
+	pr_info("kmsg_tb371_log: LU found %s (%d:%d), LBA %llu reserved\n",
+		disk->disk_name, MAJOR(b->bd_dev), MINOR(b->bd_dev), KLOG_BASE_LBA);
+	*hit = b;
+	return 1;
+}
+
+static struct block_device *klog_find_lu(void)
+{
+	struct block_device *b = NULL;
+
+	class_for_each_device(&block_class, NULL, &b, klog_probe_dev);
+	return b;
+}
+
+#else /* MODULE - positive-control build only */
+
+static char *devnode = "8:64";
+module_param(devnode, charp, 0444);
+MODULE_PARM_DESC(devnode, "major:minor of the UFS LU holding the landing zone");
+
 static struct block_device *klog_find_lu(void)
 {
 	struct block_device *b;
-	int i;
+	unsigned int maj, min;
 
-	for (i = 0; i < 8; i++) {
-		b = blkdev_get_by_dev(MKDEV(8, i * 8),
-				      FMODE_READ | FMODE_WRITE, THIS_MODULE);
-		if (IS_ERR(b))
-			continue;
-		if (i_size_read(b->bd_inode) != KLOG_LU_BYTES ||
-		    bdev_logical_block_size(b) != KLOG_SECT || !klog_sector_ours()) {
-			blkdev_put(b, FMODE_READ | FMODE_WRITE);
-			continue;
-		}
-		pr_info("kmsg_tb371_log: LU found at %d:%d, LBA %llu reserved\n",
-			MAJOR(b->bd_dev), MINOR(b->bd_dev), KLOG_BASE_LBA);
-		return b;
+	if (sscanf(devnode, "%u:%u", &maj, &min) != 2)
+		return NULL;
+	b = blkdev_get_by_dev(MKDEV(maj, min), FMODE_READ | FMODE_WRITE, klog_holder);
+	if (IS_ERR(b))
+		return NULL;
+	if (!klog_validate(b)) {
+		pr_err("kmsg_tb371_log: %u:%u failed the landing-zone identity gate\n",
+		       maj, min);
+		blkdev_put(b, FMODE_READ | FMODE_WRITE);
+		return NULL;
 	}
-	return NULL;
+	pr_info("kmsg_tb371_log: LU found %u:%u, LBA %llu reserved\n", maj, min,
+		KLOG_BASE_LBA);
+	return b;
 }
+#endif
 
 static int klog_open(void)
 {
@@ -323,8 +414,10 @@ static void __exit kmsg_tb371_log_exit(void)
 	}
 	if (armed)
 		kmsg_dump_unregister(&dumper);
-	if (bdev)
+	if (bdev) {
 		blkdev_put(bdev, FMODE_READ | FMODE_WRITE);
+		bdev = NULL;
+	}
 	free_page(pagebuf);
 	kfree(tailbuf);
 }
