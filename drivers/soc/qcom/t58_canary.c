@@ -50,9 +50,9 @@ static void __init arm(struct rung *rung)
 }
 
 static struct rung rung_late   = { .name = "level7-late",   .delay_s = 10 };
-static struct rung rung_dev    = { .name = "level6-device", .delay_s = 20 };
+static struct rung rung_dev    = { .name = "level6-device", .delay_s = 1 };
 static struct rung rung_subsys = { .name = "level1-subsys", .delay_s = 70 };
-static struct rung rung_early  = { .name = "level0-early",  .delay_s = 130 };
+static struct rung rung_early  = { .name = "level0-early",  .delay_s = 60 };
 
 static int __init early_arm(void)
 {
@@ -61,9 +61,14 @@ static int __init early_arm(void)
 }
 early_initcall(early_arm);
 
+/*
+ * Ladder round A: only two rungs are armed - level 0 at 60 s and level 6 at 1 s
+ * (deepest first, so a reboot at ~10 s vs ~70 s vs never is a three-way readout
+ * of "kernel alive past device_initcall" / "alive at level 0 only" / "no timers
+ * at all"). Re-enable subsys/late arms when the depth question moves again.
+ */
 static int __init subsys_arm(void)
 {
-	arm(&rung_subsys);
 	return 0;
 }
 subsys_initcall(subsys_arm);
@@ -77,7 +82,6 @@ device_initcall(dev_arm);
 
 static int __init late_arm(void)
 {
-	arm(&rung_late);
 	return 0;
 }
 late_initcall(late_arm);
