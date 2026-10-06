@@ -332,7 +332,13 @@ static struct block_device *klog_find_lu(void)
 				MAJOR(probes[i]), MINOR(probes[i]));
 			return b;
 		}
-	class_for_each_device(&block_class, NULL, &b, klog_probe_dev);
+	/*
+	 * block_class is registered by genhd_device_init() at subsys_initcall
+	 * (level 1). Walking it earlier makes class_for_each_device() WARN out of
+	 * its own bootstrap check, so only fall back once the class exists.
+	 */
+	if (block_class.p)
+		class_for_each_device(&block_class, NULL, &b, klog_probe_dev);
 	return b;
 }
 
@@ -451,11 +457,12 @@ static void __exit kmsg_tb371_log_exit(void)
 module_init(kmsg_tb371_log_init);
 module_exit(kmsg_tb371_log_exit);
 #else
-/* initcall level 0 instead of device_initcall: the retry loop should be running
- * before driver probe, so a kernel that dies later in boot still leaves its
- * log_buf tail on storage.
+/* device_initcall (level 6) is the level proven on hardware by build #219
+ * (claim at 1.441 s). early_initcall was tried in #220 and its worker thread was
+ * simply gone after boot with the ring untouched, cause not pinned; see
+ * state/STATE-058-*.md 2026-10-06 23:4x.
  */
-early_initcall(kmsg_tb371_log_init);
+device_initcall(kmsg_tb371_log_init);
 #endif
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("TB371FC printk flight recorder on the UFS logdump area");
