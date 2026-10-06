@@ -990,4 +990,13 @@ config KMSG_TB371_LOG
 	  boot can still be read out over EDL firehose <read> via QFIL.
 	  Permanent dev-branch diagnostic asset; keep enabled in dev builds.
 
+config T58_CANARY
+	bool "TB371FC boot-depth beacon (reboot period reveals deepest initcall)"
+	default y
+	help
+	  Arms a deferrable timer at each initcall level that force-reboots after
+	  a per-level delay, so on a board with no console and no working storage
+	  the reboot period still says how deep boot got. Dev-branch diagnostic;
+	  must be disabled in release builds.
+
 source "drivers/soc/qcom/wcnss/Kconfig"
