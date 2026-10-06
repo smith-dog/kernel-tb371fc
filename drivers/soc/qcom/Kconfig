@@ -982,7 +982,7 @@ config ICNSS_QMI
 	  over QMI channel.
 
 config KMSG_TB371_LOG
-	bool "TB371FC printk flight recorder on the UFS logdump area"
+	tristate "TB371FC printk flight recorder on the UFS logdump area"
 	default y
 	help
 	  Copies the tail of log_buf into the raw UFS 'logdump' area (LU4,

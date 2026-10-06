@@ -1,44 +1,56 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * kmsg_tb371_log - printk flight recorder for TB371FC, written straight to the
- * raw UFS 'logdump' area (no fs, no /data, no userspace, no SELinux).
+ * kmsg_tb371_log - printk flight recorder for TB371FC.
  *
- * Why raw flash and not RAM (all measured on this board, TASK-039/TASK-058):
+ * Lands the tail of log_buf on raw UFS storage so a hung or bricked boot can
+ * still be read out. Why this is the only channel on this board (all measured,
+ * TASK-039 / TASK-058):
  *  - DDR is reinitialized on every reset (XBL refills its 0xAF zone), so no
  *    log_buf, ramoops or IMEM breadcrumb survives a reboot.
- *  - The EDL firehose programmer here implements 15 functions and neither
- *    peek nor poke is among them, so RAM cannot be read out over EDL either.
+ *  - The EDL firehose programmer implements 15 functions and peek/poke are not
+ *    among them (verified live), so RAM cannot be read over EDL either.
  *  - firehose <read> does work, so anything landed on storage is retrievable
- *    from a hung/bricked device through QFIL.
+ *    from a dead device through QFIL.
  *
- * Landing zone (LBAs read off the device GPT, then cross-checked by writing a
- * pattern via QFIL and reading it back through /dev/block/by-name/logdump):
- *  UFS LU4 == /dev/sde; 'logdump' = LBA 344177..360560 (64 MiB), unused.
- * This recorder owns LBA 344177..345200 (4 MiB): sector 0 = index, sectors
- * 1..1023 = one record per sector. Nothing outside that window is touched.
+ * I/O design notes (two bugs this form specifically avoids):
+ *  - Addressed by dev_t + bio, not by a /dev path: Android keeps nodes under
+ *    /dev/block/, and a built-in writer must not depend on init mounting /dev.
+ *  - Plain buffered-O_DIRECT kernel_write is impossible here: 4.19
+ *    kernel_write() pins user pages, so a kernel buffer would fault. bio with
+ *    REQ_SYNC|REQ_FUA writes the sector straight to media instead.
+ *  - The target LU is *found*, not assumed: it must be exactly 2 GiB (LUN4 =
+ *    524288 x 4096) and the landing sector must still hold what we left there
+ *    (all-zero, our LOG1 ring, or the p367 TASK test pattern). No match, no
+ *    write - this driver must never scribble on an unknown disk.
+ *
+ * Ring layout at LUN4 LBA 344177 ('logdump', LBA 344177..360560, verified empty
+ * and unused), 1024 sectors = 4 MiB: sector 0 = index, sectors 1..1023 = one
+ * record per sector.
  */
 
+#include <linux/bio.h>
+#include <linux/blkdev.h>
 #include <linux/delay.h>
-#include <linux/fs.h>
+#include <linux/gfp.h>
 #include <linux/init.h>
 #include <linux/jiffies.h>
 #include <linux/kernel.h>
 #include <linux/kmsg_dump.h>
 #include <linux/kthread.h>
-#include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/timekeeping.h>
 #include <linux/utsname.h>
 
-#define KLOG_DEV		"/dev/sde"
-#define KLOG_BASE_LBA		344177ULL
+#define KLOG_BASE_LBA		344177ULL	/* 'logdump' first_lba, read off GPT */
+#define KLOG_LU_BYTES		(2ULL << 30)	/* LUN4 capacity guard */
 #define KLOG_SECT		4096U
-#define KLOG_RING		1024U	/* sectors incl. index sector */
+#define KLOG_SECTORS_512	(KLOG_SECT >> 9)
+#define KLOG_RING		1024U		/* sectors incl. index */
 #define KLOG_MAGIC		0x31474F4C	/* "LOG1" */
 #define KLOG_TEXT_MAX		(KLOG_SECT - 48)
-#define KLOG_TAIL_MAX		3900U	/* kmsg bytes per record */
+#define KLOG_TAIL_MAX		3900U
 #define KLOG_INTERVAL_MS	1000
 
 #define KLOG_R_PERIODIC		0
@@ -70,43 +82,52 @@ struct klog_record {
 } __packed;
 
 static DEFINE_MUTEX(klog_lock);
-static struct file *devfile;
+static struct block_device *bdev;
 static struct task_struct *worker;
 static struct kmsg_dumper dumper;
-static unsigned long pagebuf;		/* one aligned sector buffer */
+static unsigned long pagebuf;
 static char *tailbuf;
 static u64 boot_count, seq;
 static bool armed;
 
-static int klog_write(u64 lba, const void *buf)
+static int klog_bio(int op, u64 lba)
 {
-	loff_t pos = (loff_t)lba * KLOG_SECT;
-	ssize_t w = kernel_write(devfile, buf, KLOG_SECT, &pos);
+	struct bio *bio = bio_alloc(GFP_KERNEL, 1);
+	int ret;
 
-	return w == (ssize_t)KLOG_SECT ? 0 : (w < 0 ? (int)w : -EIO);
+	bio_set_op_attrs(bio, op, REQ_SYNC | REQ_FUA);
+	bio_set_dev(bio, bdev);
+	bio->bi_iter.bi_sector = lba * KLOG_SECTORS_512;
+	if (!bio_add_page(bio, virt_to_page(pagebuf), KLOG_SECT, 0))
+		pr_warn_once("kmsg_tb371_log: bio_add_page truncation\n");
+	ret = submit_bio_wait(bio);
+	bio_put(bio);
+	return ret;
 }
 
-static int klog_read(u64 lba, void *buf)
+static int klog_write(u64 lba)
 {
-	loff_t pos = (loff_t)lba * KLOG_SECT;
-	ssize_t r = kernel_read(devfile, buf, KLOG_SECT, &pos);
+	return klog_bio(REQ_OP_WRITE, lba);
+}
 
-	return r == (ssize_t)KLOG_SECT ? 0 : (r < 0 ? (int)r : -EIO);
+static int klog_read(u64 lba)
+{
+	return klog_bio(REQ_OP_READ, lba);
 }
 
 /*
- * Land one record, then refresh the index sector, then flush. 'block' is false
- * on the panic path: a locked mutex there means another CPU is mid-write and
- * spinning on it would only lose the reboot.
+ * Land one record, then refresh the index. 'block' is false on the panic path:
+ * a held mutex there means another CPU is mid-write, and spinning on it would
+ * only cost us the reboot.
  */
 static void klog_commit(const char *text, size_t len, u32 reason, bool block)
 {
 	struct klog_index *ix = (void *)pagebuf;
 	struct klog_record *rec = (void *)pagebuf;
 	u64 slot;
-	int rc = 0;
+	int rc;
 
-	if (!devfile)
+	if (!bdev)
 		return;
 	if (len > KLOG_TEXT_MAX)
 		len = KLOG_TEXT_MAX;
@@ -126,7 +147,7 @@ static void klog_commit(const char *text, size_t len, u32 reason, bool block)
 	rec->reason = reason;
 	memcpy(rec->text, text, len);
 	slot = KLOG_BASE_LBA + 1 + (seq % (KLOG_RING - 1));
-	rc = klog_write(slot, rec);
+	rc = klog_write(slot);
 	seq++;
 
 	memset(ix, 0, KLOG_SECT);
@@ -141,13 +162,11 @@ static void klog_commit(const char *text, size_t len, u32 reason, bool block)
 	ix->sector_size = KLOG_SECT;
 	ix->text_max = KLOG_TEXT_MAX;
 	strscpy(ix->uts, init_utsname()->release, sizeof(ix->uts));
-	rc |= klog_write(KLOG_BASE_LBA, ix);
-
-	vfs_fsync(devfile, 0);
+	rc |= klog_write(KLOG_BASE_LBA);
 	mutex_unlock(&klog_lock);
 
 	if (rc)
-		pr_emerg("kmsg_tb371_log: flash write failed rc=%d\n", rc);
+		pr_emerg("kmsg_tb371_log: bio write failed rc=%d\n", rc);
 }
 
 /* Newest KLOG_TAIL_MAX bytes of log_buf, first (partial) line dropped. */
@@ -182,20 +201,65 @@ static void klog_panic_dump(struct kmsg_dumper *d, enum kmsg_dump_reason reason)
 	klog_commit(tailbuf, n, KLOG_R_PANIC, false);
 }
 
+/* Is this sector one that we are allowed to own? */
+static bool klog_sector_ours(void)
+{
+	u32 *w = (void *)pagebuf;
+	int i, all_zero = 1;
+
+	if (klog_read(KLOG_BASE_LBA))
+		return false;
+	if (w[0] == KLOG_MAGIC)
+		return true;			/* our own ring */
+	if (!memcmp((void *)pagebuf, "TASK", 4))
+		return true;			/* p367 round-trip test pattern */
+	for (i = 0; i < KLOG_SECT; i++)
+		if (((char *)pagebuf)[i]) {
+			all_zero = 0;
+			break;
+		}
+	return all_zero;
+}
+
+/*
+ * Find the UFS LU that owns our landing zone: exactly 2 GiB, and the landing
+ * sector must be zero / ours / the known test pattern. Anything else is not
+ * this device and we do not write to it.
+ */
+static struct block_device *klog_find_lu(void)
+{
+	struct block_device *b;
+	int i;
+
+	for (i = 0; i < 8; i++) {
+		b = blkdev_get_by_dev(MKDEV(8, i * 8),
+				      FMODE_READ | FMODE_WRITE, THIS_MODULE);
+		if (IS_ERR(b))
+			continue;
+		if (i_size_read(b->bd_inode) != KLOG_LU_BYTES ||
+		    bdev_logical_block_size(b) != KLOG_SECT || !klog_sector_ours()) {
+			blkdev_put(b, FMODE_READ | FMODE_WRITE);
+			continue;
+		}
+		pr_info("kmsg_tb371_log: LU found at %d:%d, LBA %llu reserved\n",
+			MAJOR(b->bd_dev), MINOR(b->bd_dev), KLOG_BASE_LBA);
+		return b;
+	}
+	return NULL;
+}
+
 static int klog_open(void)
 {
 	struct klog_index *ix = (void *)pagebuf;
-	struct file *f;
-	char banner[320];
+	char banner[256];
 	int n;
 
-	f = filp_open(KLOG_DEV, O_RDWR | O_SYNC, 0);
-	if (IS_ERR(f))
-		return PTR_ERR(f);
-	devfile = f;
+	bdev = klog_find_lu();
+	if (!bdev)
+		return -ENODEV;
 
 	boot_count = 0;
-	if (klog_read(KLOG_BASE_LBA, ix) == 0 && ix->magic == KLOG_MAGIC)
+	if (!klog_read(KLOG_BASE_LBA) && ix->magic == KLOG_MAGIC)
 		boot_count = ix->boot_count + 1;
 	seq = 0;
 
@@ -204,11 +268,11 @@ static int klog_open(void)
 	kmsg_dump_register(&dumper);
 	armed = true;
 
-	pr_info("kmsg_tb371_log: armed on " KLOG_DEV " boot #%llu\n", boot_count);
 	n = scnprintf(banner, sizeof(banner),
-		      "=== kmsg_tb371_log boot #%llu uts %s ===\n%s\n",
-		      boot_count, init_utsname()->release, saved_command_line);
+		      "=== kmsg_tb371_log boot #%llu uts %s ===\n",
+		      boot_count, init_utsname()->release);
 	klog_commit(banner, n, KLOG_R_PERIODIC, true);
+	pr_info("kmsg_tb371_log: armed, boot #%llu\n", boot_count);
 	return 0;
 }
 
@@ -217,7 +281,7 @@ static int klog_fn(void *arg)
 	size_t n;
 
 	while (!kthread_should_stop()) {
-		if (!devfile) {
+		if (!bdev) {
 			klog_open();
 		} else {
 			n = klog_kmsg(tailbuf, KLOG_TEXT_MAX);
@@ -259,8 +323,8 @@ static void __exit kmsg_tb371_log_exit(void)
 	}
 	if (armed)
 		kmsg_dump_unregister(&dumper);
-	if (devfile)
-		filp_close(devfile, NULL);
+	if (bdev)
+		blkdev_put(bdev, FMODE_READ | FMODE_WRITE);
 	free_page(pagebuf);
 	kfree(tailbuf);
 }
