@@ -27,10 +27,6 @@ char random_buffer[RANDOM_BUFFER_SIZE] __aligned(PAGE_SIZE);
 
 void __init init_random_pool(void)
 {
-	/* T58: neutralized under 4.19.325 - both the TZPRNG cache-invalidate and the
-	 * add_hwgenerator_randomness path freeze the boot here (probe ladder 53-56, 55, S1).
-	 * Root cause: .325 reworked random driver + main.c lost rand_initialize(). */
-	return;
 	struct tz_prng_data data;
 	int ret;
 	struct scm_desc desc;
