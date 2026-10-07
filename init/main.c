@@ -124,6 +124,7 @@ EXPORT_SYMBOL(system_state);
 #define MAX_INIT_ENVS CONFIG_INIT_ENV_ARG_LIMIT
 
 extern void time_init(void);
+extern void t58_stage_hit(int stage);
 /* Default late time init is NULL. archs can override this later. */
 void (*__initdata late_time_init)(void);
 
@@ -574,6 +575,7 @@ asmlinkage __visible void __init start_kernel(void)
 	page_address_init();
 	pr_notice("%s", linux_banner);
 	setup_arch(&command_line);
+	t58_stage_hit(1);
 	mm_init_cpumask(&init_mm);
 	setup_command_line(command_line);
 	setup_nr_cpu_ids();
@@ -605,6 +607,7 @@ asmlinkage __visible void __init start_kernel(void)
 	sort_main_extable();
 	trap_init();
 	mm_init();
+	t58_stage_hit(2);
 
 	ftrace_init();
 
@@ -617,6 +620,7 @@ asmlinkage __visible void __init start_kernel(void)
 	 * time - but meanwhile we still have a functioning scheduler.
 	 */
 	sched_init();
+	t58_stage_hit(3);
 	/*
 	 * Disable preemption - early bootup scheduling is extremely
 	 * fragile until we cpu_idle() for the first time.
@@ -653,11 +657,13 @@ asmlinkage __visible void __init start_kernel(void)
 	early_irq_init();
 	init_IRQ();
 	tick_init();
+	t58_stage_hit(4);
 	rcu_init_nohz();
 	init_timers();
 	hrtimers_init();
 	softirq_init();
 	timekeeping_init();
+	t58_stage_hit(5);
 
 	/*
 	 * For best initial stack canary entropy, prepare it after:
@@ -672,6 +678,7 @@ asmlinkage __visible void __init start_kernel(void)
 	boot_init_stack_canary();
 
 	time_init();
+	t58_stage_hit(6);
 
 	/*
 	 * For best initial stack canary entropy, prepare it after:
@@ -729,6 +736,7 @@ asmlinkage __visible void __init start_kernel(void)
 		late_time_init();
 	sched_clock_init();
 	calibrate_delay();
+	t58_stage_hit(7);
 
 	arch_cpu_finalize_init();
 
@@ -768,6 +776,7 @@ asmlinkage __visible void __init start_kernel(void)
 	}
 
 	/* Do the rest non-__init'ed, we're now alive */
+	t58_stage_hit(8);
 	rest_init();
 
 	prevent_tail_call_optimization();
@@ -1178,6 +1187,7 @@ static noinline void __init kernel_init_freeable(void)
 	page_alloc_init_late();
 	/* Initialize page ext after all struct pages are initialized. */
 	page_ext_init();
+	t58_stage_hit(9);
 
 	do_basic_setup();
 

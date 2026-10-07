@@ -999,4 +999,11 @@ config T58_CANARY
 	  the reboot period still says how deep boot got. Dev-branch diagnostic;
 	  must be disabled in release builds.
 
+config T58_BEACON
+	tristate "TB371FC start_kernel-milestone reboot beacon"
+	default y
+	help
+	  Dev-branch diagnostic: cmdline-selectable start_kernel milestone that
+	  busy-waits and reboots, to bisect the early freeze without a console.
+
 source "drivers/soc/qcom/wcnss/Kconfig"
