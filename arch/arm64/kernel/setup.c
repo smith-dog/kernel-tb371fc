@@ -296,6 +296,8 @@ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
 
 void __init __weak init_random_pool(void) { }
 
+extern void t58_stage_hit(int stage);
+
 void __init setup_arch(char **cmdline_p)
 {
 	init_mm.start_code = (unsigned long) _text;
@@ -356,9 +358,11 @@ void __init setup_arch(char **cmdline_p)
 		psci_dt_init();
 	else
 		psci_acpi_init();
+	t58_stage_hit(10);
 
 	cpu_read_bootcpu_ops();
 	smp_init_cpus();
+	t58_stage_hit(11);
 	smp_build_mpidr_hash();
 
 	/* Init percpu seeds for random tags after cpus are set up. */
