@@ -1717,6 +1717,10 @@ static struct usb_function_instance *ncm_alloc_inst(void)
 	opts->func_inst.free_func_inst = ncm_free_inst;
 
 	config_group_init_type_name(&opts->func_inst.group, "", &ncm_func_type);
+
+	descs[0] = &opts->ncm_os_desc;
+	names[0] = "ncm";
+
 	ncm_interf_group =
 		usb_os_desc_prepare_interf_dir(&opts->func_inst.group, 1, descs,
 					       names, THIS_MODULE);
