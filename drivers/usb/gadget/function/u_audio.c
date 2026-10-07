@@ -629,11 +629,9 @@ void g_audio_cleanup(struct g_audio *g_audio)
 		return;
 
 	uac = g_audio->uac;
-	g_audio->uac = NULL;
-
 	card = uac->card;
 	if (card)
-		snd_card_free_when_closed(card);
+		snd_card_free(card);
 
 	kfree(uac->p_prm.ureq);
 	kfree(uac->c_prm.ureq);
