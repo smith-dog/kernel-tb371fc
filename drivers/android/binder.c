@@ -2574,7 +2574,8 @@ static int binder_translate_binder(struct flat_binder_object *fp,
 		ret = -EINVAL;
 		goto done;
 	}
-	if (security_binder_transfer_binder(proc->tsk, target_proc->tsk)) {
+	if (security_binder_transfer_binder(binder_tsk_cred(proc->tsk),
+					 binder_tsk_cred(target_proc->tsk))) {
 		ret = -EPERM;
 		goto done;
 	}
@@ -2620,7 +2621,8 @@ static int binder_translate_handle(struct flat_binder_object *fp,
 				  proc->pid, thread->pid, fp->handle);
 		return -EINVAL;
 	}
-	if (security_binder_transfer_binder(proc->tsk, target_proc->tsk)) {
+	if (security_binder_transfer_binder(binder_tsk_cred(proc->tsk),
+					 binder_tsk_cred(target_proc->tsk))) {
 		ret = -EPERM;
 		goto done;
 	}
@@ -2704,7 +2706,7 @@ static int binder_translate_fd(int fd,
 		ret = -EBADF;
 		goto err_fget;
 	}
-	ret = security_binder_transfer_file(proc->tsk, target_proc->tsk, file);
+	ret = security_binder_transfer_file(binder_tsk_cred(proc->tsk), binder_tsk_cred(target_proc->tsk), file);
 	if (ret < 0) {
 		ret = -EPERM;
 		goto err_security;
@@ -4917,6 +4919,16 @@ out:
 	return ret;
 }
 
+/*
+ * T58: the .325 security hooks take const struct cred *, while this .198-era
+ * binder tracks tasks. proc holds a task reference for its lifetime, so the
+ * task cannot exit under us and __task_cred stays valid for the call.
+ */
+static const struct cred *binder_tsk_cred(struct task_struct *tsk)
+{
+	return __task_cred(tsk);
+}
+
 static int binder_ioctl_set_ctx_mgr(struct file *filp,
 				    struct flat_binder_object *fbo)
 {
@@ -4932,7 +4944,7 @@ static int binder_ioctl_set_ctx_mgr(struct file *filp,
 		ret = -EBUSY;
 		goto out;
 	}
-	ret = security_binder_set_context_mgr(proc->tsk);
+	ret = security_binder_set_context_mgr(binder_tsk_cred(proc->tsk));
 	if (ret < 0)
 		goto out;
 	if (uid_valid(context->binder_context_mgr_uid)) {
