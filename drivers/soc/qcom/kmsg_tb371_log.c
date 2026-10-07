@@ -220,8 +220,7 @@ static void klog_panic_dump(struct kmsg_dumper *d, enum kmsg_dump_reason reason)
 	kmsg_dump_rewind(&it);
 	if (!kmsg_dump_get_buffer(&it, false, panicbuf, sizeof(panicbuf), &len))
 		return;
-	while (off < len && panicbuf[off] != '
-')
+	while (off < len && panicbuf[off] != '\n')
 		off++;
 	if (off >= len)
 		return;
