@@ -921,6 +921,8 @@ static inline void do_trace_initcall_finish(initcall_t fn, int ret)
 }
 #endif /* !TRACEPOINTS_ENABLED */
 
+#define T58_IC_N 150
+
 int __init_or_module do_one_initcall(initcall_t fn)
 {
 	int count = preempt_count();
@@ -929,6 +931,15 @@ int __init_or_module do_one_initcall(initcall_t fn)
 
 	if (initcall_blacklisted(fn))
 		return -EPERM;
+
+	{
+		extern int t58_canary_off;
+		if (!t58_canary_off) {
+			static int t58_ic_count;
+			if (++t58_ic_count == T58_IC_N)
+				t58_stage_hit(60);
+		}
+	}
 
 	do_trace_initcall_start(fn);
 	ret = fn();
