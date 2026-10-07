@@ -224,6 +224,39 @@ static void klog_panic_dump(struct kmsg_dumper *d, enum kmsg_dump_reason reason)
 		off++;
 	if (off >= len)
 		return;
+	/*
+	 * T58 panic head search: commit from the panic output head (the oops
+	 * trigger), not from the 64KB window start (which is just the pre-panic
+	 * boot log). reboot=panic_warm turns every panic into a restart, and the
+	 * restart kills this multi-chunk write after the first block - so the
+	 * trigger MUST be in the first committed chunk.
+	 */
+	{
+		static const char *const markers[] = {
+			"Unable to handle", "Internal error", "Kernel BUG",
+			"Bad mode in", "SMP: stopping secondary CPUs",
+		};
+		int mi;
+		for (mi = 0; mi < ARRAY_SIZE(markers); mi++) {
+			const char *f = panicbuf;
+			size_t mlen = strlen(markers[mi]);
+			while (f <= panicbuf + len - mlen) {
+				f = memchr(f, markers[mi][0],
+						   len - (size_t)(f - panicbuf));
+				if (!f)
+					break;
+				if (!memcmp(f, markers[mi], mlen) && f > panicbuf) {
+					size_t no = f - panicbuf;
+					while (no > 0 && panicbuf[no - 1] != '\n')
+						no--;
+					if (no < off)
+						off = no;
+					break;
+				}
+				f++;
+			}
+		}
+	}
 	while (off < len) {
 		size_t c = min_t(size_t, KLOG_TEXT_MAX, len - off);
 
