@@ -56,8 +56,15 @@ void __init init_random_pool(void)
 	/* T58: dmac_inv_range skipped - freezes the boot under 4.19.325 (probe 56/55 bracket); root-cause pending */
 		bytes_received = (bytes_received <= RANDOM_BUFFER_SIZE) ?
 					bytes_received : RANDOM_BUFFER_SIZE;
-		add_hwgenerator_randomness(random_buffer, bytes_received,
-					   bytes_received << 3);
+		/*
+	 * T58 fix-forward: use add_device_randomness (no entropy crediting, no
+	 * sleeping) - the .325 add_hwgenerator_randomness added a throttle that
+	 * sleeps 10s when called from setup_arch context, freezing the boot.
+	 * Also skips dmac_inv_range (hangs under 4.19.325, root cause pending):
+	 * the TZPRNG wrote via DMA while the CPU holds BSS-zeroing cache lines,
+	 * so skipping means slightly stale bytes mixed as non-credited entropy.
+	 */
+	add_device_randomness(random_buffer, bytes_received);
 	t58_stage_hit(55);
 	}
 }
