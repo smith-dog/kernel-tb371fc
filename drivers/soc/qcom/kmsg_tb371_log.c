@@ -205,7 +205,7 @@ static size_t klog_kmsg(char *out, size_t cap)
  * 16 KB at panic time and commit it as consecutive records so the trigger
  * always lands in the ring.
  */
-static char panicbuf[16384] __aligned(4);
+static char panicbuf[65536] __aligned(4);
 
 static void klog_panic_dump(struct kmsg_dumper *d, enum kmsg_dump_reason reason)
 {
