@@ -99,11 +99,15 @@ void t58_stage_hit(int stage)
 	if (t58stage != stage)
 		return;
 
-	pr_emerg("stage %d hit - busy wait then restart\n", stage);
-	/* crude busy wait: the loop period only has to be visible on screen */
+	/*
+	 * NO printk here: once the console= alias registers earlycon inside
+	 * parse_early_param, a printk from the beacon itself goes out over the
+	 * UART and a hang there fakes a "frozen" reading for a healthy boot
+	 * (the whole S-ladder was voided by this). The reboot loop period is
+	 * the only observable; it needs no output.
+	 */
 	for (i = 0; i < 300000000UL; i++)
 		;
-	pr_emerg("stage %d restarting\n", stage);
 
 	if (stage >= 20)
 		t58_smc_reset();	/* pre-parse zone: raw PSCI SMC */
