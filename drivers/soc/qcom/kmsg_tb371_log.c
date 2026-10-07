@@ -247,6 +247,13 @@ static void klog_panic_dump(struct kmsg_dumper *d, enum kmsg_dump_reason reason)
 			"Bad mode in", "SMP: stopping secondary CPUs",
 		};
 		int mi;
+		size_t best = off;
+		int found = 0;
+		/*
+		 * earliest marker wins: its line start becomes the commit point.
+		 * (The previous `if (no < off) off = no` form always discarded the
+		 * result because off starts at the window start - the minimum.)
+		 */
 		for (mi = 0; mi < ARRAY_SIZE(markers); mi++) {
 			const char *f = panicbuf;
 			size_t mlen = strlen(markers[mi]);
@@ -259,13 +266,17 @@ static void klog_panic_dump(struct kmsg_dumper *d, enum kmsg_dump_reason reason)
 					size_t no = f - panicbuf;
 					while (no > 0 && panicbuf[no - 1] != '\n')
 						no--;
-					if (no < off)
-						off = no;
+					if (!found || no < best) {
+						best = no;
+						found = 1;
+					}
 					break;
 				}
 				f++;
 			}
 		}
+		if (found)
+			off = best;
 	}
 	/*
 	 * T58: commit ONE chunk starting at the oops head (the marker search
