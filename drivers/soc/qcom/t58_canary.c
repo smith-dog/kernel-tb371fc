@@ -44,7 +44,7 @@ static void fire(struct timer_list *t)
 	emergency_restart();
 }
 
-static int t58_canary_off = 1;
+static volatile int t58_canary_off = 1;
 
 static void __init arm(struct rung *rung)
 {
