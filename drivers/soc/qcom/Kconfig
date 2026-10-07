@@ -999,6 +999,13 @@ config T58_CANARY
 	  the reboot period still says how deep boot got. Dev-branch diagnostic;
 	  must be disabled in release builds.
 
+config T58_TASKS
+	tristate "TB371FC all-task stack dump diagnostic"
+	default y
+	help
+	  Dev-branch diagnostic: dumps every task stack in 1.15s chunks
+	  (matched to the flight recorder cadence) once, 45s after boot.
+
 config T58_BEACON
 	tristate "TB371FC start_kernel-milestone reboot beacon"
 	default y

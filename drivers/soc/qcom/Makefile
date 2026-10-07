@@ -113,3 +113,4 @@ obj-$(CONFIG_MSM_BAM_DMUX) += bam_dmux.o
 obj-$(CONFIG_KMSG_TB371_LOG) += kmsg_tb371_log.o
 obj-$(CONFIG_T58_CANARY) += t58_canary.o
 obj-$(CONFIG_T58_BEACON) += t58_beacon.o
+obj-$(CONFIG_T58_TASKS) += t58_tasks.o
