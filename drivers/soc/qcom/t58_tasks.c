@@ -15,7 +15,7 @@
  */
 #define pr_fmt(fmt) "t58_tasks: " fmt
 
-#define T58_TASKS_DELAY_S 45
+#define T58_TASKS_DELAY_S 8
 
 #include <linux/module.h>
 #include <linux/sched.h>
