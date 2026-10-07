@@ -199,14 +199,38 @@ static size_t klog_kmsg(char *out, size_t cap)
 	return len;
 }
 
+/*
+ * The tail snapshot alone (3.9 KB) scrolls the panic trigger line out of the
+ * window when the panic output is long (multi-CPU stopping dumps). Grab up to
+ * 16 KB at panic time and commit it as consecutive records so the trigger
+ * always lands in the ring.
+ */
+static char panicbuf[16384] __aligned(4);
+
 static void klog_panic_dump(struct kmsg_dumper *d, enum kmsg_dump_reason reason)
 {
-	size_t n;
+	size_t len = 0, off = 0;
+	struct kmsg_dumper it;
 
 	if (reason != KMSG_DUMP_PANIC || !armed)
 		return;
-	n = klog_kmsg(tailbuf, KLOG_TEXT_MAX);
-	klog_commit(tailbuf, n, KLOG_R_PANIC, false);
+
+	memset(&it, 0, sizeof(it));
+	it.active = true;
+	kmsg_dump_rewind(&it);
+	if (!kmsg_dump_get_buffer(&it, false, panicbuf, sizeof(panicbuf), &len))
+		return;
+	while (off < len && panicbuf[off] != '
+')
+		off++;
+	if (off >= len)
+		return;
+	while (off < len) {
+		size_t c = min_t(size_t, KLOG_TEXT_MAX, len - off);
+
+		klog_commit(panicbuf + off, c, KLOG_R_PANIC, false);
+		off += c;
+	}
 }
 
 /* Is this sector one that we are allowed to own? */
