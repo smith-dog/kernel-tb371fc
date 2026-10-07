@@ -921,7 +921,7 @@ static inline void do_trace_initcall_finish(initcall_t fn, int ret)
 }
 #endif /* !TRACEPOINTS_ENABLED */
 
-#define T58_IC_N 800
+#define T58_IC_N 1000
 
 int __init_or_module do_one_initcall(initcall_t fn)
 {
