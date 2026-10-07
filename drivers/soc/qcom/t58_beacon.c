@@ -109,10 +109,13 @@ void t58_stage_hit(int stage)
 	for (i = 0; i < 300000000UL; i++)
 		;
 
-	if (stage >= 20)
-		t58_smc_reset();	/* pre-parse zone: raw PSCI SMC */
-	else if (stage >= 10)
-		emergency_restart();	/* arm_pm_restart is registered */
-	else
-		t58_wdt_bite();		/* pre-psci: bite the watchdog */
+	/*
+	 * Reset via the proven raw PSCI SMC at every stage. Do NOT branch on
+	 * stage number: stages 12-18 sit BEFORE psci_dt_init registers
+	 * arm_pm_restart, so emergency_restart() there halts at "Reboot
+	 * failed" and fakes a frozen reading for a healthy machine.
+	 */
+	t58_smc_reset();
+	/* belt and braces if the SMC ever returns */
+	emergency_restart();
 }
