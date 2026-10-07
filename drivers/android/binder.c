@@ -82,6 +82,8 @@
 #include "binder_trace.h"
 
 static HLIST_HEAD(binder_deferred_list);
+static const struct cred *binder_tsk_cred(struct task_struct *tsk);
+
 static DEFINE_MUTEX(binder_deferred_lock);
 
 static HLIST_HEAD(binder_devices);
@@ -3119,8 +3121,8 @@ static void binder_transaction(struct binder_proc *proc,
 			goto err_dead_binder;
 		}
 		e->to_node = target_node->debug_id;
-		if (security_binder_transaction(proc->tsk,
-						target_proc->tsk) < 0) {
+		if (security_binder_transaction(binder_tsk_cred(proc->tsk),
+						binder_tsk_cred(target_proc->tsk)) < 0) {
 			return_error = BR_FAILED_REPLY;
 			return_error_param = -EPERM;
 			return_error_line = __LINE__;
@@ -4917,16 +4919,6 @@ static int binder_ioctl_write_read(struct file *filp,
 	}
 out:
 	return ret;
-}
-
-/*
- * T58: the .325 security hooks take const struct cred *, while this .198-era
- * binder tracks tasks. proc holds a task reference for its lifetime, so the
- * task cannot exit under us and __task_cred stays valid for the call.
- */
-static const struct cred *binder_tsk_cred(struct task_struct *tsk)
-{
-	return __task_cred(tsk);
 }
 
 static int binder_ioctl_set_ctx_mgr(struct file *filp,
