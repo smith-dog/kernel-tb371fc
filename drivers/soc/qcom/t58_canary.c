@@ -46,6 +46,10 @@ static void fire(struct timer_list *t)
 
 static void __init arm(struct rung *rung)
 {
+	/* T58: all rungs disarmed - the machine now survives device_initcall,
+	 * so the 1s rung was masking everything after it. Let it run to its
+	 * real freeze; the flight recorder keeps the final log. */
+	return;
 	timer_setup(&rung->t, fire, 0);
 	rung->t.expires = jiffies + msecs_to_jiffies(rung->delay_s * MSEC_PER_SEC);
 	add_timer(&rung->t);
