@@ -50,8 +50,7 @@ void __init init_random_pool(void)
 				bytes_received);
 
 		t58_stage_hit(56);
-		dmac_inv_range(random_buffer, random_buffer +
-						RANDOM_BUFFER_SIZE);
+	/* T58: dmac_inv_range skipped - freezes the boot under 4.19.325 (probe 56/55 bracket); root-cause pending */
 		bytes_received = (bytes_received <= RANDOM_BUFFER_SIZE) ?
 					bytes_received : RANDOM_BUFFER_SIZE;
 		add_hwgenerator_randomness(random_buffer, bytes_received,
