@@ -49,6 +49,7 @@ void __init init_random_pool(void)
 			pr_warn("Did not receive the expected number of bytes from PRNG: %llu\n",
 				bytes_received);
 
+		t58_stage_hit(56);
 		dmac_inv_range(random_buffer, random_buffer +
 						RANDOM_BUFFER_SIZE);
 		bytes_received = (bytes_received <= RANDOM_BUFFER_SIZE) ?
