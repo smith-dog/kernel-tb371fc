@@ -84,6 +84,11 @@
 static HLIST_HEAD(binder_deferred_list);
 static const struct cred *binder_tsk_cred(struct task_struct *tsk);
 
+static const struct cred *binder_tsk_cred(struct task_struct *tsk)
+{
+	return __task_cred(tsk);
+}
+
 static DEFINE_MUTEX(binder_deferred_lock);
 
 static HLIST_HEAD(binder_devices);
