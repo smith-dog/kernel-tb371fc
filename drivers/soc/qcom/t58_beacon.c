@@ -43,7 +43,7 @@
  * sit BEFORE parse_early_param, where the cmdline is not yet parsed, so the
  * selection cannot come from t58stage= on the command line.
  */
-static int t58stage = 56;
+static int t58stage = -1;
 
 /*
  * PSCI SYSTEM_RESET via raw SMC (stock DTB: arm,psci-1.0, method="smc";
