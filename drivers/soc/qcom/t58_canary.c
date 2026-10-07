@@ -72,6 +72,7 @@ early_initcall(early_arm);
  */
 static int __init subsys_arm(void)
 {
+	arm(&rung_subsys);
 	return 0;
 }
 subsys_initcall(subsys_arm);
@@ -85,6 +86,7 @@ device_initcall(dev_arm);
 
 static int __init late_arm(void)
 {
+	arm(&rung_late);
 	return 0;
 }
 late_initcall(late_arm);
