@@ -44,8 +44,12 @@ static void fire(struct timer_list *t)
 	emergency_restart();
 }
 
+static int t58_canary_off = 1;
+
 static void __init arm(struct rung *rung)
 {
+	if (t58_canary_off)
+		return;
 	/* T58: all rungs disarmed - the machine now survives device_initcall,
 	 * so the 1s rung was masking everything after it. Let it run to its
 	 * real freeze; the flight recorder keeps the final log. */
