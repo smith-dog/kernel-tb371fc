@@ -90,7 +90,13 @@ static int __init t58stage_setup(char *s)
 	pr_info("cmdline selected stage %d\n", t58stage);
 	return 1;
 }
-early_param("t58stage=", t58stage_setup);
+/*
+ * The table name must NOT carry a trailing '=': do_early_param compares
+ * parameq(param, p->str) where next_arg already split "t58stage=13" into
+ * param="t58stage" val="13". With "t58stage=" the entry never matches and
+ * every cmdline-armed probe silently never arms.
+ */
+early_param("t58stage", t58stage_setup);
 
 void t58_stage_hit(int stage)
 {
