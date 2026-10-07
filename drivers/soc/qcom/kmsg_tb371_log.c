@@ -50,6 +50,8 @@
 #define KLOG_SECT		4096U
 #define KLOG_SECTORS_512	(KLOG_SECT >> 9)
 #define KLOG_RING		1024U		/* sectors incl. index */
+#define KLOG_PANIC_SLOTS	24U		/* reserved tail slots for panic dumps */
+#define KLOG_RING_USE		(KLOG_RING - KLOG_PANIC_SLOTS - 1U) /* normal snapshot range */
 #define KLOG_MAGIC		0x31474F4C	/* "LOG1" */
 #define KLOG_TEXT_MAX		(KLOG_SECT - 48)
 #define KLOG_TAIL_MAX		3900U
@@ -128,11 +130,20 @@ static int klog_read(u64 lba)
  * a held mutex there means another CPU is mid-write, and spinning on it would
  * only cost us the reboot.
  */
+static void klog_commit_slot(const char *text, size_t len, u32 reason,
+				     bool block, u64 slot);
+
 static void klog_commit(const char *text, size_t len, u32 reason, bool block)
+{
+	klog_commit_slot(text, len, reason, block,
+			 KLOG_BASE_LBA + 1 + (seq % KLOG_RING_USE));
+}
+
+static void klog_commit_slot(const char *text, size_t len, u32 reason,
+			     bool block, u64 slot)
 {
 	struct klog_index *ix = (void *)pagebuf;
 	struct klog_record *rec = (void *)pagebuf;
-	u64 slot;
 	int rc;
 
 	if (!bdev)
@@ -154,7 +165,6 @@ static void klog_commit(const char *text, size_t len, u32 reason, bool block)
 	rec->len = len;
 	rec->reason = reason;
 	memcpy(rec->text, text, len);
-	slot = KLOG_BASE_LBA + 1 + (seq % (KLOG_RING - 1));
 	rc = klog_write(slot);
 	seq++;
 
@@ -257,11 +267,25 @@ static void klog_panic_dump(struct kmsg_dumper *d, enum kmsg_dump_reason reason)
 			}
 		}
 	}
-	while (off < len) {
-		size_t c = min_t(size_t, KLOG_TEXT_MAX, len - off);
+	/*
+	 * T58: commit the panic chunks into the RESERVED tail slots, newest
+	 * chunk first. Normal 1 s snapshots only ever touch slots
+	 * [0, KLOG_RING_USE), so a panic capture survives every subsequent
+	 * boot untouched (until the next panic overwrites it).
+	 */
+	{
+		size_t chunk_off = len;
+		u32 idx = KLOG_RING_USE;
 
-		klog_commit(panicbuf + off, c, KLOG_R_PANIC, false);
-		off += c;
+		while (chunk_off > 0 && idx < KLOG_RING - 1) {
+			size_t back = min_t(size_t, KLOG_TEXT_MAX, chunk_off);
+
+			chunk_off -= back;
+			klog_commit_slot(panicbuf + chunk_off, back,
+					      KLOG_R_PANIC, false,
+					      KLOG_BASE_LBA + 1 + idx);
+			idx++;
+		}
 	}
 }
 
