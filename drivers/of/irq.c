@@ -799,6 +799,23 @@ struct irq_domain *of_msi_get_domain(struct device *dev,
 			return d;
 	}
 
+	/*
+	 * T58: this platform's MSI controller (qcom,pci-msi) has no
+	 * #msi-cells property, which makes the iterator above stop with an
+	 * error before it can match. Fall back to the simple single
+	 * msi-parent lookup so the hand-rolled pci-msm MSI domain is found.
+	 */
+	{
+		struct device_node *msi_np = of_parse_phandle(np, "msi-parent", 0);
+
+		if (msi_np) {
+			d = irq_find_matching_host(msi_np, token);
+			of_node_put(msi_np);
+			if (d)
+				return d;
+		}
+	}
+
 	return NULL;
 }
 
