@@ -27,6 +27,9 @@ char random_buffer[RANDOM_BUFFER_SIZE] __aligned(PAGE_SIZE);
 
 void __init init_random_pool(void)
 {
+	/* T58: neutralized (round 2) - isolating the RNG-init-call fix from the
+	 * init_random_pool freeze; re-design of this function is a follow-up. */
+	return;
 	struct tz_prng_data data;
 	int ret;
 	struct scm_desc desc;
