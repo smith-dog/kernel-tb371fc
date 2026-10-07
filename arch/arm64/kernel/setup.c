@@ -374,6 +374,7 @@ void __init setup_arch(char **cmdline_p)
 	smp_init_cpus();
 	t58_stage_hit(11);
 	smp_build_mpidr_hash();
+	t58_stage_hit(50);
 
 	/* Init percpu seeds for random tags after cpus are set up. */
 	kasan_init_tags();
@@ -386,6 +387,7 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	init_task.thread_info.ttbr0 = __pa_symbol(empty_zero_page);
 #endif
+	t58_stage_hit(51);
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
@@ -402,6 +404,7 @@ void __init setup_arch(char **cmdline_p)
 	}
 
 	init_random_pool();
+	t58_stage_hit(52);
 }
 
 static int __init topology_init(void)
