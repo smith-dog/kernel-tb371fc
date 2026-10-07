@@ -559,10 +559,12 @@ asmlinkage __visible void __init start_kernel(void)
 	char *after_dashes;
 
 	set_task_stack_end_magic(&init_task);
+	t58_stage_hit(20);
 	smp_setup_processor_id();
 	debug_objects_early_init();
 
 	cgroup_init_early();
+	t58_stage_hit(21);
 
 	local_irq_disable();
 	early_boot_irqs_disabled = true;

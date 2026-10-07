@@ -38,7 +38,26 @@
 #include <linux/sizes.h>
 #include <asm/early_ioremap.h>
 
+/*
+ * Default stage baked at build time (sed this line per probe): stages >= 20
+ * sit BEFORE parse_early_param, where the cmdline is not yet parsed, so the
+ * selection cannot come from t58stage= on the command line.
+ */
 static int t58stage = -1;
+
+/*
+ * PSCI SYSTEM_RESET via raw SMC (stock DTB: arm,psci-1.0, method="smc";
+ * the same call the psci driver issues, proven by the C0 reboot loop).
+ * Works from any EL1 context with the MMU on - no ioremap, no DT scan, no
+ * registered handler needed. HVC fallback in case the conduit ever differs.
+ */
+static noinline void t58_smc_reset(void)
+{
+	register long x0 asm("x0") = 0x84000009;	/* PSCI 0.2 SYSTEM_RESET */
+
+	asm volatile("smc #0" : : "r"(x0) : "x1", "x2", "x3", "memory");
+	asm volatile("hvc #0" : : "r"(x0) : "x1", "x2", "x3", "memory");
+}
 
 /*
  * Raw WDT bite: the pre-psci_dt_init stages have no arm_pm_restart handler,
@@ -86,7 +105,9 @@ void t58_stage_hit(int stage)
 		;
 	pr_emerg("stage %d restarting\n", stage);
 
-	if (stage >= 10)
+	if (stage >= 20)
+		t58_smc_reset();	/* pre-parse zone: raw PSCI SMC */
+	else if (stage >= 10)
 		emergency_restart();	/* arm_pm_restart is registered */
 	else
 		t58_wdt_bite();		/* pre-psci: bite the watchdog */

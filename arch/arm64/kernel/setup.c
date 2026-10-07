@@ -309,8 +309,10 @@ void __init setup_arch(char **cmdline_p)
 
 	early_fixmap_init();
 	early_ioremap_init();
+	t58_stage_hit(22);
 
 	setup_machine_fdt(__fdt_pointer);
+	t58_stage_hit(23);
 	t58_stage_hit(12);
 
 	/*
@@ -318,6 +320,7 @@ void __init setup_arch(char **cmdline_p)
 	 * cpufeature code and early parameters.
 	 */
 	jump_label_init();
+	t58_stage_hit(24);
 	parse_early_param();
 	t58_stage_hit(13);
 
