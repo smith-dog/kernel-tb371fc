@@ -34,8 +34,33 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/reboot.h>
+#include <linux/io.h>
+#include <linux/sizes.h>
+#include <asm/early_ioremap.h>
 
 static int t58stage = -1;
+
+/*
+ * Raw WDT bite: the pre-psci_dt_init stages have no arm_pm_restart handler,
+ * so emergency_restart() would halt at "Reboot failed". Biting the qcom WDT
+ * directly (same registers the vendor watchdog_v2 driver uses) resets the
+ * machine from anywhere after early_ioremap_init(). Base 0x17C10000 is the
+ * stock DTB's qcom,wdt@17c10000 (qcom,msm-watchdog).
+ */
+static void t58_wdt_bite(void)
+{
+	void __iomem *base = early_ioremap(0x17C10000UL, SZ_4K);
+
+	if (!base)
+		return;
+	/* WDT0_BITE_TIME = 1 tick, then RST arms it: bite within ~ms */
+	__raw_writel(1, base + 0x14);
+	mb();
+	__raw_writel(1, base + 0x04);
+	mb();
+	for (;;)
+		cpu_relax();
+}
 
 static int __init t58stage_setup(char *s)
 {
@@ -60,5 +85,9 @@ void t58_stage_hit(int stage)
 	for (i = 0; i < 300000000UL; i++)
 		;
 	pr_emerg("stage %d restarting\n", stage);
-	emergency_restart();
+
+	if (stage >= 10)
+		emergency_restart();	/* arm_pm_restart is registered */
+	else
+		t58_wdt_bite();		/* pre-psci: bite the watchdog */
 }

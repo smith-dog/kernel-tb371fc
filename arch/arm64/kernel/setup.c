@@ -311,6 +311,7 @@ void __init setup_arch(char **cmdline_p)
 	early_ioremap_init();
 
 	setup_machine_fdt(__fdt_pointer);
+	t58_stage_hit(12);
 
 	/*
 	 * Initialise the static keys early as they may be enabled by the
@@ -318,6 +319,7 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	jump_label_init();
 	parse_early_param();
+	t58_stage_hit(13);
 
 	/*
 	 * Unmask asynchronous aborts and fiq after bringing up possible
@@ -334,9 +336,12 @@ void __init setup_arch(char **cmdline_p)
 
 	xen_early_init();
 	efi_init();
+	t58_stage_hit(14);
 	arm64_memblock_init();
+	t58_stage_hit(15);
 
 	paging_init();
+	t58_stage_hit(16);
 
 	acpi_table_upgrade();
 
@@ -345,8 +350,10 @@ void __init setup_arch(char **cmdline_p)
 
 	if (acpi_disabled)
 		unflatten_device_tree();
+	t58_stage_hit(17);
 
 	bootmem_init();
+	t58_stage_hit(18);
 
 	kasan_init();
 
