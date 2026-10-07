@@ -268,25 +268,15 @@ static void klog_panic_dump(struct kmsg_dumper *d, enum kmsg_dump_reason reason)
 		}
 	}
 	/*
-	 * T58: commit the panic chunks into the RESERVED tail slots, newest
-	 * chunk first. Normal 1 s snapshots only ever touch slots
-	 * [0, KLOG_RING_USE), so a panic capture survives every subsequent
-	 * boot untouched (until the next panic overwrites it).
+	 * T58: commit ONE chunk starting at the oops head (the marker search
+	 * above moved off there). Panic-context flash writes only reliably
+	 * land one chunk, so spend it on the trigger + registers + reason
+	 * instead of the multi-CPU stop-dump tail. The chunk goes into a
+	 * reserved tail slot that normal snapshots never overwrite.
 	 */
-	{
-		size_t chunk_off = len;
-		u32 idx = KLOG_RING_USE;
-
-		while (chunk_off > 0 && idx < KLOG_RING - 1) {
-			size_t back = min_t(size_t, KLOG_TEXT_MAX, chunk_off);
-
-			chunk_off -= back;
-			klog_commit_slot(panicbuf + chunk_off, back,
-					      KLOG_R_PANIC, false,
-					      KLOG_BASE_LBA + 1 + idx);
-			idx++;
-		}
-	}
+	klog_commit_slot(panicbuf + off, min_t(size_t, KLOG_TEXT_MAX, len - off),
+			 KLOG_R_PANIC, false,
+			 KLOG_BASE_LBA + 1 + KLOG_RING_USE);
 }
 
 /* Is this sector one that we are allowed to own? */
