@@ -27,9 +27,6 @@ char random_buffer[RANDOM_BUFFER_SIZE] __aligned(PAGE_SIZE);
 
 void __init init_random_pool(void)
 {
-	/* T58: neutralized (round 2) - isolating the RNG-init-call fix from the
-	 * init_random_pool freeze; re-design of this function is a follow-up. */
-	return;
 	struct tz_prng_data data;
 	int ret;
 	struct scm_desc desc;
@@ -39,6 +36,7 @@ void __init init_random_pool(void)
 	desc.args[1] = data.out_buf_sz = SZ_512;
 	desc.arginfo = SCM_ARGS(2, SCM_RW, SCM_VAL);
 
+	/* Clean the buffer to DRAM so the TZ PRNG DMA sees/maintains it. */
 	dmac_flush_range(random_buffer, random_buffer + RANDOM_BUFFER_SIZE);
 
 	t58_stage_hit(53);
@@ -53,19 +51,26 @@ void __init init_random_pool(void)
 				bytes_received);
 
 		t58_stage_hit(56);
-	/* T58: dmac_inv_range skipped - freezes the boot under 4.19.325 (probe 56/55 bracket); root-cause pending */
 		bytes_received = (bytes_received <= RANDOM_BUFFER_SIZE) ?
 					bytes_received : RANDOM_BUFFER_SIZE;
 		/*
-	 * T58 fix-forward: use add_device_randomness (no entropy crediting, no
-	 * sleeping) - the .325 add_hwgenerator_randomness added a throttle that
-	 * sleeps 10s when called from setup_arch context, freezing the boot.
-	 * Also skips dmac_inv_range (hangs under 4.19.325, root cause pending):
-	 * the TZPRNG wrote via DMA while the CPU holds BSS-zeroing cache lines,
-	 * so skipping means slightly stale bytes mixed as non-credited entropy.
-	 */
-	add_device_randomness(random_buffer, bytes_received);
-	t58_stage_hit(55);
+		 * Invalidate the CPU's stale BSS-zero cache lines so the
+		 * bytes the TZ PRNG wrote via DMA are what we read back.
+		 * The .325-era freeze bracketed this together with
+		 * add_hwgenerator_randomness and the then-lost RNG init;
+		 * re-proven benign under the fixed environment.
+		 */
+		dmac_inv_range(random_buffer, random_buffer + bytes_received);
+		/*
+		 * add_device_randomness, NOT add_hwgenerator_randomness: the
+		 * .325 add_hwgenerator_randomness gained a throttle that
+		 * sleeps 10s when crng is not ready - fatal in setup_arch
+		 * context. This early seed is an optimization, never credited.
+		 */
+		add_device_randomness(random_buffer, bytes_received);
+		pr_info("init_random_pool: injected %llu bytes from TZ PRNG\n",
+			bytes_received);
+		t58_stage_hit(55);
 	}
 }
 
