@@ -1451,6 +1451,16 @@ static int ncm_bind(struct usb_configuration *c, struct usb_function *f)
 		return -EINVAL;
 
 	ncm_opts = container_of(f->fi, struct f_ncm_opts, func_inst);
+
+	if (cdev->use_os_string) {
+		f->os_desc_table = kzalloc(sizeof(*f->os_desc_table),
+					   GFP_KERNEL);
+		if (!f->os_desc_table)
+			return -ENOMEM;
+		f->os_desc_n = 1;
+		f->os_desc_table[0].os_desc = &ncm_opts->ncm_os_desc;
+	}
+
 	/*
 	 * in drivers/usb/gadget/configfs.c:configfs_composite_bind()
 	 * configurations are bound in sequence with list_for_each_entry,
@@ -1698,6 +1708,7 @@ static void ncm_free_inst(struct usb_function_instance *f)
 	opts = container_of(f, struct f_ncm_opts, func_inst);
 	if (opts->bound)
 		gether_cleanup(netdev_priv(opts->net));
+	kfree(opts->ncm_interf_group);	/* single VLA chunk */
 	kfree(opts);
 }
 
@@ -1718,6 +1729,7 @@ static struct usb_function_instance *ncm_alloc_inst(void)
 
 	config_group_init_type_name(&opts->func_inst.group, "", &ncm_func_type);
 
+	INIT_LIST_HEAD(&opts->ncm_os_desc.ext_prop);
 	descs[0] = &opts->ncm_os_desc;
 	names[0] = "ncm";
 
