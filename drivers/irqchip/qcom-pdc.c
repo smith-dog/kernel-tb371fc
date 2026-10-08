@@ -71,7 +71,7 @@ static void pdc_enable_intr(struct irq_data *d, bool on)
 	enable = on ? ENABLE_INTR(enable, mask) : CLEAR_INTR(enable, mask);
 	pdc_reg_write(IRQ_ENABLE_BANK, index, enable);
 	ipc_log_string(pdc_ipc_log, "PIN=%d enable=%d", d->hwirq, on);
-	raw_spin_unlock(&pdc_lock);
+	raw_spin_unlock_irqrestore(&pdc_lock, flags);
 }
 
 static void qcom_pdc_gic_disable(struct irq_data *d)
