@@ -330,6 +330,11 @@ static int virtio_gpu_resource_create_ioctl(struct drm_device *dev, void *data,
 	rc->res_handle = qobj->hw_res_handle; /* similiar to a VM address */
 	rc->bo_handle = handle;
 
+	if (vgdev->has_virgl_3d) {
+		virtio_gpu_unref_list(&validate_list);
+		dma_fence_put(&fence->f);
+	}
+
 	/*
 	 * The handle owns the reference now.  But we must drop our
 	 * remaining reference *after* we no longer need to dereference
