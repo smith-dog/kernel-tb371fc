@@ -662,6 +662,26 @@ static void hidg_ssreport_complete(struct usb_ep *ep, struct usb_request *req)
 	wake_up(&hidg->read_queue);
 }
 
+/*
+ * TASK-062 ep0 trace. Windows refuses to start this HID interface (PnP code 10)
+ * as soon as any report has non-zero length; this records which class/standard
+ * request actually reaches the function and which one we answer with a STALL.
+ * Budgeted so a churning gadget cannot fill kmsg; dev-branch diagnostic only.
+ */
+static atomic_t hidg_ep0_budget = ATOMIC_INIT(200);
+
+static void hidg_ep0_dbg(struct f_hidg *hidg, const struct usb_ctrlrequest *ctrl,
+			 const char *tag)
+{
+	if (atomic_dec_return(&hidg_ep0_budget) < 0)
+		return;
+	pr_info("hidg ep0 %s: type=0x%02x req=0x%02x v=0x%04x i=0x%04x l=0x%04x use_out_ep=%d rdl=%u rl=%u\n",
+		tag, ctrl->bRequestType, ctrl->bRequest,
+		__le16_to_cpu(ctrl->wValue), __le16_to_cpu(ctrl->wIndex),
+		__le16_to_cpu(ctrl->wLength), hidg->use_out_ep,
+		hidg->report_desc_length, hidg->report_length);
+}
+
 static int hidg_setup(struct usb_function *f,
 		const struct usb_ctrlrequest *ctrl)
 {
@@ -673,6 +693,8 @@ static int hidg_setup(struct usb_function *f,
 
 	value	= __le16_to_cpu(ctrl->wValue);
 	length	= __le16_to_cpu(ctrl->wLength);
+
+	hidg_ep0_dbg(hidg, ctrl, "enter");
 
 	VDBG(cdev,
 	     "%s crtl_request : bRequestType:0x%x bRequest:0x%x Value:0x%x\n",
@@ -783,9 +805,11 @@ static int hidg_setup(struct usb_function *f,
 	}
 
 stall:
+	hidg_ep0_dbg(hidg, ctrl, "STALL");
 	return -EOPNOTSUPP;
 
 respond:
+	hidg_ep0_dbg(hidg, ctrl, "respond");
 	req->zero = 0;
 	req->length = length;
 	status = usb_ep_queue(cdev->gadget->ep0, req, GFP_ATOMIC);
@@ -831,6 +855,12 @@ static int hidg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	struct usb_request			*req_in = NULL;
 	unsigned long				flags;
 	int i, status = 0;
+
+	if (atomic_dec_return(&hidg_ep0_budget) >= 0)
+		pr_info("hidg set_alt: intf=%u alt=%u in=%s out=%s use_out_ep=%d rl=%u\n",
+			intf, alt, hidg->in_ep ? hidg->in_ep->name : "-",
+			hidg->out_ep ? hidg->out_ep->name : "-",
+			hidg->use_out_ep, hidg->report_length);
 
 	VDBG(cdev, "hidg_set_alt intf:%d alt:%d\n", intf, alt);
 
@@ -920,6 +950,8 @@ disable_ep_in:
 		usb_ep_disable(hidg->in_ep);
 
 fail:
+	if (status && atomic_dec_return(&hidg_ep0_budget) >= 0)
+		pr_info("hidg set_alt FAILED: status=%d\n", status);
 	return status;
 }
 
@@ -1035,6 +1067,14 @@ static int hidg_bind(struct usb_configuration *c, struct usb_function *f)
 	status = cdev_device_add(&hidg->cdev, &hidg->dev);
 	if (status)
 		goto fail_free_descs;
+
+	if (atomic_dec_return(&hidg_ep0_budget) >= 0)
+		pr_info("hidg bind: node=hidg%d neps=%u use_out_ep=%d rdl=%u rl=%u in=%s out=%s\n",
+			MINOR(hidg->dev.devt), hidg_interface_desc.bNumEndpoints,
+			hidg->use_out_ep, hidg->report_desc_length,
+			hidg->report_length,
+			hidg->in_ep ? hidg->in_ep->name : "-",
+			hidg->out_ep ? hidg->out_ep->name : "-");
 
 	return 0;
 fail_free_descs:
