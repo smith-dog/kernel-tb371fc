@@ -1728,6 +1728,9 @@ static struct usb_function_instance *ncm_alloc_inst(void)
 	struct usb_os_desc *descs[1];
 	char *names[1];
 	struct config_group *ncm_interf_group;
+#ifdef CONFIG_USB_CONFIGFS_UEVENT
+	struct ncm_setup_desc *desc;
+#endif
 
 	opts = kzalloc(sizeof(*opts), GFP_KERNEL);
 	if (!opts)
@@ -1753,17 +1756,29 @@ static struct usb_function_instance *ncm_alloc_inst(void)
 	opts->ncm_interf_group = ncm_interf_group;
 
 #ifdef CONFIG_USB_CONFIGFS_UEVENT
-	_ncm_setup_desc = kzalloc(sizeof(*_ncm_setup_desc), GFP_KERNEL);
-	if (!_ncm_setup_desc) {
-		ncm_free_inst(&opts->func_inst);
+	/* _ncm_setup_desc is shared by every ncm instance, so build the new one
+	 * locally and publish it only once its uevent device exists.  The error
+	 * paths below free just this instance as ncm_free_inst() does for an
+	 * unbound one, because ncm_free_inst() would also tear down whatever
+	 * uevent desc the global still refers to -- possibly a live instance's.
+	 */
+	desc = kzalloc(sizeof(*desc), GFP_KERNEL);
+	if (!desc) {
+		kfree(opts->ncm_interf_group);
+		kfree(opts);
 		return ERR_PTR(-ENOMEM);
 	}
-	INIT_WORK(&_ncm_setup_desc->work, ncm_setup_work);
-	_ncm_setup_desc->device = create_function_device("f_ncm");
-	if (IS_ERR(_ncm_setup_desc->device)) {
-		ncm_free_inst(&opts->func_inst);
-		return ERR_CAST(_ncm_setup_desc->device);
+	INIT_WORK(&desc->work, ncm_setup_work);
+	desc->device = create_function_device("f_ncm");
+	if (IS_ERR(desc->device)) {
+		int err = PTR_ERR(desc->device);
+
+		kfree(desc);
+		kfree(opts->ncm_interf_group);
+		kfree(opts);
+		return ERR_PTR(err);
 	}
+	_ncm_setup_desc = desc;
 #endif
 
 	return &opts->func_inst;
