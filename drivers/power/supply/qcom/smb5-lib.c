@@ -1953,14 +1953,20 @@ int smblib_vbus_regulator_enable(struct regulator_dev *rdev)
 
 	smblib_dbg(chg, PR_OTG, "enabling OTG\n");
 
-	rc = gpio_direction_output(chg->gpio_boost_en, 1);
-	//rc = smblib_masked_write(chg, DCDC_CMD_OTG_REG, OTG_EN_BIT, OTG_EN_BIT);
-	if (rc < 0) {
-		smblib_err(chg, "Couldn't enable OTG rc=%d\n", rc);
-		return rc;
+	if (gpio_is_valid(chg->gpio_boost_en)) {
+		rc = gpio_direction_output(chg->gpio_boost_en, 1);
+		if (rc < 0)
+			smblib_err(chg, "Couldn't enable boost GPIO rc=%d\n", rc);
 	}
 
-	return 0;
+	/* Lenovo's DTB has no qcom,gpio_boost_en, so this GPIO-only path left the
+	 * PMIC OTG boost off and bus-powered hubs saw no VBUS.
+	 */
+	rc = smblib_masked_write(chg, DCDC_CMD_OTG_REG, OTG_EN_BIT, OTG_EN_BIT);
+	if (rc < 0)
+		smblib_err(chg, "Couldn't enable OTG rc=%d\n", rc);
+
+	return rc;
 }
 
 int smblib_vbus_regulator_disable(struct regulator_dev *rdev)
@@ -1970,8 +1976,13 @@ int smblib_vbus_regulator_disable(struct regulator_dev *rdev)
 
 	smblib_dbg(chg, PR_OTG, "disabling OTG\n");
 
-	rc = gpio_direction_output(chg->gpio_boost_en, 0);
-	//rc = smblib_masked_write(chg, DCDC_CMD_OTG_REG, OTG_EN_BIT, 0);
+	if (gpio_is_valid(chg->gpio_boost_en)) {
+		rc = gpio_direction_output(chg->gpio_boost_en, 0);
+		if (rc < 0)
+			smblib_err(chg, "Couldn't disable boost GPIO rc=%d\n", rc);
+	}
+
+	rc = smblib_masked_write(chg, DCDC_CMD_OTG_REG, OTG_EN_BIT, 0);
 	if (rc < 0) {
 		smblib_err(chg, "Couldn't disable OTG regulator rc=%d\n", rc);
 		return rc;
