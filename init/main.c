@@ -672,17 +672,13 @@ asmlinkage __visible void __init start_kernel(void)
 	t58_stage_hit(5);
 
 	/*
-	 * For best initial stack canary entropy, prepare it after:
-	 * - setup_arch() for any UEFI RNG entropy and boot cmdline access
-	 * - timekeeping_init() for ktime entropy used in rand_initialize()
-	 * - rand_initialize() to get any arch-specific entropy like RDRAND
-	 * - add_latent_entropy() to get any latent entropy
-	 * - adding command line entropy
+	 * Earliest seeding that is available at this point: arch randomness
+	 * (Qualcomm TZ PRNG via arch_get_random_long_early), the latent-entropy
+	 * plugin seed and the boot cmdline - random_init_early() mixes all three
+	 * itself. The stack canary is deliberately NOT initialised here; there is
+	 * exactly one boot_init_stack_canary() below, after time_init().
 	 */
 	random_init_early(command_line);
-	add_latent_entropy();
-	add_device_randomness(command_line, strlen(command_line));
-	boot_init_stack_canary();
 
 	time_init();
 	t58_stage_hit(6);
