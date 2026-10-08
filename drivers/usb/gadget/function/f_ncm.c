@@ -1700,11 +1700,19 @@ static void ncm_free_inst(struct usb_function_instance *f)
 	struct f_ncm_opts *opts;
 
 #ifdef CONFIG_USB_CONFIGFS_UEVENT
-	cancel_work_sync(&_ncm_setup_desc->work);
-	/* release _ncm_setup_desc related resource */
-	device_destroy(_ncm_setup_desc->device->class,
-		_ncm_setup_desc->device->devt);
-	kfree(_ncm_setup_desc);
+	if (_ncm_setup_desc) {
+		cancel_work_sync(&_ncm_setup_desc->work);
+		/* release _ncm_setup_desc related resource.
+		 * create_function_device() returns ERR_PTR() on failure and the old
+		 * code stored it as if it were a struct device *, so an instance whose
+		 * device creation failed blew up here on the configfs rmdir.
+		 */
+		if (!IS_ERR_OR_NULL(_ncm_setup_desc->device))
+			device_destroy(_ncm_setup_desc->device->class,
+				     _ncm_setup_desc->device->devt);
+		kfree(_ncm_setup_desc);
+		_ncm_setup_desc = NULL;
+	}
 #endif
 
 	opts = container_of(f, struct f_ncm_opts, func_inst);
@@ -1746,10 +1754,16 @@ static struct usb_function_instance *ncm_alloc_inst(void)
 
 #ifdef CONFIG_USB_CONFIGFS_UEVENT
 	_ncm_setup_desc = kzalloc(sizeof(*_ncm_setup_desc), GFP_KERNEL);
-	if (!_ncm_setup_desc)
+	if (!_ncm_setup_desc) {
+		ncm_free_inst(&opts->func_inst);
 		return ERR_PTR(-ENOMEM);
+	}
 	INIT_WORK(&_ncm_setup_desc->work, ncm_setup_work);
 	_ncm_setup_desc->device = create_function_device("f_ncm");
+	if (IS_ERR(_ncm_setup_desc->device)) {
+		ncm_free_inst(&opts->func_inst);
+		return ERR_CAST(_ncm_setup_desc->device);
+	}
 #endif
 
 	return &opts->func_inst;
