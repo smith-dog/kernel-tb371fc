@@ -1728,6 +1728,9 @@ int vfs_mkobj2(struct vfsmount *, struct dentry *, umode_t,
 int vfs_fchown(struct file *file, uid_t user, gid_t group);
 int vfs_fchmod(struct file *file, umode_t mode);
 
+int vfs_fchown(struct file *file, uid_t user, gid_t group);
+int vfs_fchmod(struct file *file, umode_t mode);
+
 extern long vfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
 /*
