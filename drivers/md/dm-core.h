@@ -18,6 +18,8 @@
 #include "dm.h"
 
 #define DM_RESERVED_MAX_IOS		1024
+#define DM_MAX_TARGETS			1048576
+#define DM_MAX_TARGET_PARAMS		1024
 
 struct dm_kobject_holder {
 	struct kobject kobj;
@@ -109,6 +111,10 @@ struct mapped_device {
 
 	/* zero-length flush that will be cloned and submitted to targets */
 	struct bio flush_bio;
+
+	int swap_bios;
+	struct semaphore swap_bios_semaphore;
+	struct mutex swap_bios_lock;
 
 	struct dm_stats stats;
 

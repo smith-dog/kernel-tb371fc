@@ -173,6 +173,8 @@ fscrypt_free_dummy_context(struct fscrypt_dummy_context *dummy_ctx)
 }
 
 /* keyring.c */
+int fscrypt_symlink_getattr(const struct path *path, struct kstat *stat);
+
 void fscrypt_sb_free(struct super_block *sb);
 int fscrypt_ioctl_add_key(struct file *filp, void __user *arg);
 int fscrypt_ioctl_remove_key(struct file *filp, void __user *arg);
@@ -854,5 +856,16 @@ static inline void fscrypt_finalize_bounce_page(struct page **pagep)
 		*pagep = fscrypt_pagecache_page(page);
 		fscrypt_free_bounce_page(page);
 	}
+}
+
+/*
+ * Stable 4.19.2xx+ ext4/fs-crypto call these; our fscrypt (pre-nokey-name
+ * era) never marks dentries as no-key, so the check is always false here.
+ */
+void fscrypt_sb_free(struct super_block *sb);
+
+static inline bool fscrypt_is_nokey_name(const struct dentry *dentry)
+{
+	return false;
 }
 #endif	/* _LINUX_FSCRYPT_H */

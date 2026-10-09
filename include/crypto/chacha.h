@@ -26,6 +26,17 @@
 
 #define CHACHA_STATE_WORDS	(CHACHA_BLOCK_SIZE / sizeof(u32))
 
+/* compat names used by android-common drivers/char/random.c */
+#define CHACHA20_KEY_SIZE	CHACHA_KEY_SIZE
+#define CHACHA20_BLOCK_SIZE	CHACHA_BLOCK_SIZE
+static inline void chacha_init_consts(u32 *state)
+{
+	state[0] = 0x61707865; /* "expa" */
+	state[1] = 0x3320646e; /* "nd 3" */
+	state[2] = 0x79622d32; /* "2-by" */
+	state[3] = 0x6b206574; /* "te k" */
+}
+
 /* 192-bit nonce, then 64-bit stream position */
 #define XCHACHA_IV_SIZE		32
 

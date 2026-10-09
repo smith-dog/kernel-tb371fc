@@ -156,7 +156,7 @@ static int map_vdso(const struct vdso_image *image, unsigned long addr)
 	unsigned long text_start;
 	int ret = 0;
 
-	if (down_write_killable(&mm->mmap_sem))
+	if (mmap_write_lock_killable(mm))
 		return -EINTR;
 
 	addr = get_unmapped_area(NULL, addr,
@@ -199,7 +199,7 @@ static int map_vdso(const struct vdso_image *image, unsigned long addr)
 	}
 
 up_fail:
-	up_write(&mm->mmap_sem);
+	mmap_write_unlock(mm);
 	return ret;
 }
 
@@ -228,8 +228,8 @@ static unsigned long vdso_addr(unsigned long start, unsigned len)
 
 	/* Round the lowest possible end address up to a PMD boundary. */
 	end = (start + len + PMD_SIZE - 1) & PMD_MASK;
-	if (end >= TASK_SIZE_MAX)
-		end = TASK_SIZE_MAX;
+	if (end >= DEFAULT_MAP_WINDOW)
+		end = DEFAULT_MAP_WINDOW;
 	end -= len;
 
 	if (end > start) {
@@ -261,7 +261,7 @@ int map_vdso_once(const struct vdso_image *image, unsigned long addr)
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
 
-	down_write(&mm->mmap_sem);
+	mmap_write_lock(mm);
 	/*
 	 * Check if we have already mapped vdso blob - fail to prevent
 	 * abusing from userspace install_speciall_mapping, which may
@@ -272,11 +272,11 @@ int map_vdso_once(const struct vdso_image *image, unsigned long addr)
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
 		if (vma_is_special_mapping(vma, &vdso_mapping) ||
 				vma_is_special_mapping(vma, &vvar_mapping)) {
-			up_write(&mm->mmap_sem);
+			mmap_write_unlock(mm);
 			return -EEXIST;
 		}
 	}
-	up_write(&mm->mmap_sem);
+	mmap_write_unlock(mm);
 
 	return map_vdso(image, addr);
 }
@@ -329,9 +329,43 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 static __init int vdso_setup(char *s)
 {
 	vdso64_enabled = simple_strtoul(s, NULL, 0);
-	return 0;
+	return 1;
 }
 __setup("vdso=", vdso_setup);
+#endif
+
+#ifdef CONFIG_X86_64
+static void vgetcpu_cpu_init(void *arg)
+{
+	int cpu = smp_processor_id();
+	struct desc_struct d = { };
+	unsigned long node = 0;
+#ifdef CONFIG_NUMA
+	node = cpu_to_node(cpu);
+#endif
+	if (boot_cpu_has(X86_FEATURE_RDTSCP) || boot_cpu_has(X86_FEATURE_RDPID))
+		write_rdtscp_aux((node << 12) | cpu);
+
+	/*
+	 * Store cpu number in limit so that it can be loaded
+	 * quickly in user space in vgetcpu. (12 bits for the CPU
+	 * and 8 bits for the node)
+	 */
+	d.limit0 = cpu | ((node & 0xf) << 12);
+	d.limit1 = node >> 4;
+	d.type = 5;		/* RO data, expand down, accessed */
+	d.dpl = 3;		/* Visible to user code */
+	d.s = 1;		/* Not a system segment */
+	d.p = 1;		/* Present */
+	d.d = 1;		/* 32-bit */
+
+	write_gdt_entry(get_cpu_gdt_rw(cpu), GDT_ENTRY_PER_CPU, &d, DESCTYPE_S);
+}
+
+static int vgetcpu_online(unsigned int cpu)
+{
+	return smp_call_function_single(cpu, vgetcpu_cpu_init, NULL, 1);
+}
 
 static int __init init_vdso(void)
 {

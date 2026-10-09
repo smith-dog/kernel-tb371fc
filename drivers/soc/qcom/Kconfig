@@ -37,6 +37,7 @@ config BUG_ON_HW_MEM_ONLINE_FAIL
 config QCOM_GENI_SE
 	tristate "QCOM GENI Serial Engine Driver"
 	depends on ARCH_QCOM || COMPILE_TEST
+	select REGMAP_MMIO
 	help
 	  This driver is used to manage Generic Interface (GENI) firmware based
 	  Qualcomm Technologies, Inc. Universal Peripheral (QUP) Wrapper. This
@@ -979,5 +980,37 @@ config ICNSS_QMI
 	  handshake messages to WLAN FW, which includes hardware capabilities
 	  and configurations. It also send WLAN on/off control message to FW
 	  over QMI channel.
+
+config KMSG_TB371_LOG
+	tristate "TB371FC printk flight recorder on the UFS logdump area"
+	default y
+	help
+	  Copies the tail of log_buf into the raw UFS 'logdump' area (LU4,
+	  LBA 344177..) once a second and once on panic, so a hung or bricked
+	  boot can still be read out over EDL firehose <read> via QFIL.
+	  Permanent dev-branch diagnostic asset; keep enabled in dev builds.
+
+config T58_CANARY
+	bool "TB371FC boot-depth beacon (reboot period reveals deepest initcall)"
+	default y
+	help
+	  Arms a deferrable timer at each initcall level that force-reboots after
+	  a per-level delay, so on a board with no console and no working storage
+	  the reboot period still says how deep boot got. Dev-branch diagnostic;
+	  must be disabled in release builds.
+
+config T58_TASKS
+	tristate "TB371FC all-task stack dump diagnostic"
+	default y
+	help
+	  Dev-branch diagnostic: dumps every task stack in 1.15s chunks
+	  (matched to the flight recorder cadence) once, 45s after boot.
+
+config T58_BEACON
+	tristate "TB371FC start_kernel-milestone reboot beacon"
+	default y
+	help
+	  Dev-branch diagnostic: cmdline-selectable start_kernel milestone that
+	  busy-waits and reboots, to bisect the early freeze without a console.
 
 source "drivers/soc/qcom/wcnss/Kconfig"

@@ -55,6 +55,15 @@
 /* huaqin add for SD card bringup by liufurong at 20190201 start */
 #ifdef CONFIG_MMC_SDHCI_BH201
 #include "../host/sdhci-msm.h"
+
+/*
+ * QC eMMC bkops helper; device storage is UFS, eMMC bkops inactive.
+ */
+static inline int mmc_card_doing_bkops(struct mmc_card *card)
+{
+	return 0;
+}
+
 #else
 #define SDHCI_TIMEOUT_CONTROL	0x2E
 #endif
@@ -1238,17 +1247,25 @@ static int mmc_mrq_prep(struct mmc_host *host, struct mmc_request *mrq)
 int mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 {
 	int err;
-	#ifdef CONFIG_MMC_SDHCI_MSM_BH201
-	struct sdhci_host * host_sdhci = mmc_priv(host);
+
 	init_completion(&mrq->cmd_completion);
 
 	mmc_retune_hold(host);
-	//Add by ZhaoZiqiang for timeout controller register setting debug begin
-	if (sdhci_readb(host_sdhci, SDHCI_TIMEOUT_CONTROL)!= 0xE)
+	/*
+	 * Keep the vendor debug read scoped to its own symbol: CONFIG_MMC_SDHCI_MSM_BH201
+	 * has no Kconfig entry anywhere in this tree, so an #ifdef around the statements
+	 * above silently deletes the retune hold that mmc_wait_for_req_done() releases.
+	 */
+	#ifdef CONFIG_MMC_SDHCI_MSM_BH201
 	{
-		pr_info("TEST_print: host reg SDHCI_TIMEOUT_CONTROL is 0x%X\n", sdhci_readb(host_sdhci, SDHCI_TIMEOUT_CONTROL));
+		struct sdhci_host * host_sdhci = mmc_priv(host);
+		//Add by ZhaoZiqiang for timeout controller register setting debug begin
+		if (sdhci_readb(host_sdhci, SDHCI_TIMEOUT_CONTROL)!= 0xE)
+		{
+			pr_info("TEST_print: host reg SDHCI_TIMEOUT_CONTROL is 0x%X\n", sdhci_readb(host_sdhci, SDHCI_TIMEOUT_CONTROL));
+		}
+		//Add by ZhaoZiqiang for timeout controller register setting debug end
 	}
-	//Add by ZhaoZiqiang for timeout controller register setting debug end
 	#endif
 
 	if (mmc_card_removed(host->card))
@@ -1481,21 +1498,26 @@ int mmc_cqe_recovery(struct mmc_host *host)
 	host->cqe_ops->cqe_recovery_start(host);
 
 	memset(&cmd, 0, sizeof(cmd));
-	cmd.opcode       = MMC_STOP_TRANSMISSION,
-	cmd.flags        = MMC_RSP_R1B | MMC_CMD_AC,
+	cmd.opcode       = MMC_STOP_TRANSMISSION;
+	cmd.flags        = MMC_RSP_R1B | MMC_CMD_AC;
 	cmd.flags       &= ~MMC_RSP_CRC; /* Ignore CRC */
-	cmd.busy_timeout = MMC_CQE_RECOVERY_TIMEOUT,
-	mmc_wait_for_cmd(host, &cmd, 0);
+	cmd.busy_timeout = MMC_CQE_RECOVERY_TIMEOUT;
+	mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
+
+	mmc_poll_for_busy(host->card, MMC_CQE_RECOVERY_TIMEOUT, true, true);
 
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.opcode       = MMC_CMDQ_TASK_MGMT;
 	cmd.arg          = 1; /* Discard entire queue */
 	cmd.flags        = MMC_RSP_R1B | MMC_CMD_AC;
 	cmd.flags       &= ~MMC_RSP_CRC; /* Ignore CRC */
-	cmd.busy_timeout = MMC_CQE_RECOVERY_TIMEOUT,
-	err = mmc_wait_for_cmd(host, &cmd, 0);
+	cmd.busy_timeout = MMC_CQE_RECOVERY_TIMEOUT;
+	err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
 
 	host->cqe_ops->cqe_recovery_finish(host);
+
+	if (err)
+		err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
 
 	mmc_retune_release(host);
 
@@ -1929,11 +1951,14 @@ int mmc_execute_tuning(struct mmc_card *card)
 
 	err = host->ops->execute_tuning(host, opcode);
 
-	if (err)
+	if (err) {
 		pr_err("%s: tuning execution failed: %d\n",
 			mmc_hostname(host), err);
-	else
+	} else {
+		host->retune_now = 0;
+		host->need_retune = 0;
 		mmc_retune_enable(host);
+	}
 
 	return err;
 }
@@ -2407,7 +2432,13 @@ u32 mmc_select_voltage(struct mmc_host *host, u32 ocr)
 		mmc_power_cycle(host, ocr);
 	} else {
 		bit = fls(ocr) - 1;
-		ocr &= 3 << bit;
+		/*
+		 * The bit variable represents the highest voltage bit set in
+		 * the OCR register.
+		 * To keep a range of 2 values (e.g. 3.2V/3.3V and 3.3V/3.4V),
+		 * we must shift the mask '3' with (bit - 1).
+		 */
+		ocr &= 3 << (bit - 1);
 		if (bit != host->ios.vdd)
 			dev_warn(mmc_dev(host), "exceeding card's volts\n");
 	}
@@ -2490,7 +2521,7 @@ int mmc_set_uhs_voltage(struct mmc_host *host, u32 ocr)
 
 	err = mmc_wait_for_cmd(host, &cmd, 0);
 	if (err)
-		return err;
+		goto power_cycle;
 
 	if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR))
 		return -EIO;

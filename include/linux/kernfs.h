@@ -78,6 +78,7 @@ enum kernfs_root_flag {
 	 * fhandle to access nodes of the fs.
 	 */
 	KERNFS_ROOT_SUPPORT_EXPORTOP		= 0x0004,
+	KERNFS_ROOT_SUPPORT_USER_XATTR	= 0x0008,
 };
 
 /* type-specific structures for kernfs_node union members */

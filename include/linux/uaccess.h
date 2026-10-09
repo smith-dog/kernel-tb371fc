@@ -333,6 +333,22 @@ extern long probe_user_read(void *dst, const void __user *src, size_t size);
  * happens, handle that and return -EFAULT.
  */
 extern long notrace probe_kernel_write(void *dst, const void *src, size_t size);
+
+/*
+ * 5.x-era nofault accessors (stable backports reference them); map onto the
+ * 4.19 probe_kernel_* implementations.
+ */
+static inline long copy_from_kernel_nofault(void *dst, const void *src, size_t size)
+{
+	return probe_kernel_read(dst, src, size);
+}
+static inline long copy_to_kernel_nofault(void *dst, const void *src, size_t size)
+{
+	return probe_kernel_write(dst, src, size);
+}
+#define get_kernel_nofault(val, ptr) 	copy_from_kernel_nofault(&(val), (ptr), sizeof(val))
+#define put_kernel_nofault(val, ptr) 	copy_to_kernel_nofault((ptr), &(val), sizeof(val))
+
 extern long notrace __probe_kernel_write(void *dst, const void *src, size_t size);
 
 /*
