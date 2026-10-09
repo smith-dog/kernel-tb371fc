@@ -296,8 +296,6 @@ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
 
 void __init __weak init_random_pool(void) { }
 
-extern void t58_stage_hit(int stage);
-
 void __init setup_arch(char **cmdline_p)
 {
 	init_mm.start_code = (unsigned long) _text;
@@ -309,20 +307,15 @@ void __init setup_arch(char **cmdline_p)
 
 	early_fixmap_init();
 	early_ioremap_init();
-	t58_stage_hit(22);
 
 	setup_machine_fdt(__fdt_pointer);
-	t58_stage_hit(23);
-	t58_stage_hit(12);
 
 	/*
 	 * Initialise the static keys early as they may be enabled by the
 	 * cpufeature code and early parameters.
 	 */
 	jump_label_init();
-	t58_stage_hit(24);
 	parse_early_param();
-	t58_stage_hit(13);
 
 	/*
 	 * Unmask asynchronous aborts and fiq after bringing up possible
@@ -339,12 +332,9 @@ void __init setup_arch(char **cmdline_p)
 
 	xen_early_init();
 	efi_init();
-	t58_stage_hit(14);
 	arm64_memblock_init();
-	t58_stage_hit(15);
 
 	paging_init();
-	t58_stage_hit(16);
 
 	acpi_table_upgrade();
 
@@ -353,10 +343,8 @@ void __init setup_arch(char **cmdline_p)
 
 	if (acpi_disabled)
 		unflatten_device_tree();
-	t58_stage_hit(17);
 
 	bootmem_init();
-	t58_stage_hit(18);
 
 	kasan_init();
 
@@ -368,13 +356,10 @@ void __init setup_arch(char **cmdline_p)
 		psci_dt_init();
 	else
 		psci_acpi_init();
-	t58_stage_hit(10);
 
 	cpu_read_bootcpu_ops();
 	smp_init_cpus();
-	t58_stage_hit(11);
 	smp_build_mpidr_hash();
-	t58_stage_hit(50);
 
 	/* Init percpu seeds for random tags after cpus are set up. */
 	kasan_init_tags();
@@ -387,7 +372,6 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	init_task.thread_info.ttbr0 = __pa_symbol(empty_zero_page);
 #endif
-	t58_stage_hit(51);
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
@@ -404,7 +388,6 @@ void __init setup_arch(char **cmdline_p)
 	}
 
 	init_random_pool();
-	t58_stage_hit(52);
 }
 
 static int __init topology_init(void)

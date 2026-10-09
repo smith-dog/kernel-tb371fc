@@ -124,7 +124,6 @@ EXPORT_SYMBOL(system_state);
 #define MAX_INIT_ENVS CONFIG_INIT_ENV_ARG_LIMIT
 
 extern void time_init(void);
-extern void t58_stage_hit(int stage);
 /* Default late time init is NULL. archs can override this later. */
 void (*__initdata late_time_init)(void);
 
@@ -447,19 +446,15 @@ static int __init do_early_param(char *param, char *val,
 {
 	const struct obs_kernel_param *p;
 
-	t58_stage_hit(41);
 	for (p = __setup_start; p < __setup_end; p++) {
 		if ((p->early && parameq(param, p->str)) ||
 		    (strcmp(param, "console") == 0 &&
 		     strcmp(p->str, "earlycon") == 0)
 		) {
-			t58_stage_hit(43);
 			if (p->setup_func(val) != 0)
 				pr_warn("Malformed early option '%s'\n", param);
-			t58_stage_hit(44);
 		}
 	}
-	t58_stage_hit(42);
 	/* We accept everything at this stage. */
 	return 0;
 }
@@ -563,12 +558,10 @@ asmlinkage __visible void __init start_kernel(void)
 	char *after_dashes;
 
 	set_task_stack_end_magic(&init_task);
-	t58_stage_hit(20);
 	smp_setup_processor_id();
 	debug_objects_early_init();
 
 	cgroup_init_early();
-	t58_stage_hit(21);
 
 	local_irq_disable();
 	early_boot_irqs_disabled = true;
@@ -581,7 +574,6 @@ asmlinkage __visible void __init start_kernel(void)
 	page_address_init();
 	pr_notice("%s", linux_banner);
 	setup_arch(&command_line);
-	t58_stage_hit(1);
 	mm_init_cpumask(&init_mm);
 	setup_command_line(command_line);
 	setup_nr_cpu_ids();
@@ -613,7 +605,6 @@ asmlinkage __visible void __init start_kernel(void)
 	sort_main_extable();
 	trap_init();
 	mm_init();
-	t58_stage_hit(2);
 
 	ftrace_init();
 
@@ -626,7 +617,6 @@ asmlinkage __visible void __init start_kernel(void)
 	 * time - but meanwhile we still have a functioning scheduler.
 	 */
 	sched_init();
-	t58_stage_hit(3);
 	/*
 	 * Disable preemption - early bootup scheduling is extremely
 	 * fragile until we cpu_idle() for the first time.
@@ -663,13 +653,11 @@ asmlinkage __visible void __init start_kernel(void)
 	early_irq_init();
 	init_IRQ();
 	tick_init();
-	t58_stage_hit(4);
 	rcu_init_nohz();
 	init_timers();
 	hrtimers_init();
 	softirq_init();
 	timekeeping_init();
-	t58_stage_hit(5);
 
 	/*
 	 * Earliest seeding that is available at this point: arch randomness
@@ -681,7 +669,6 @@ asmlinkage __visible void __init start_kernel(void)
 	random_init_early(command_line);
 
 	time_init();
-	t58_stage_hit(6);
 
 	/*
 	 * For best initial stack canary entropy, prepare it after:
@@ -740,7 +727,6 @@ asmlinkage __visible void __init start_kernel(void)
 		late_time_init();
 	sched_clock_init();
 	calibrate_delay();
-	t58_stage_hit(7);
 
 	arch_cpu_finalize_init();
 
@@ -780,7 +766,6 @@ asmlinkage __visible void __init start_kernel(void)
 	}
 
 	/* Do the rest non-__init'ed, we're now alive */
-	t58_stage_hit(8);
 	rest_init();
 
 	prevent_tail_call_optimization();
@@ -919,8 +904,6 @@ static inline void do_trace_initcall_finish(initcall_t fn, int ret)
 }
 #endif /* !TRACEPOINTS_ENABLED */
 
-#define T58_IC_N 1114
-
 int __init_or_module do_one_initcall(initcall_t fn)
 {
 	int count = preempt_count();
@@ -929,15 +912,6 @@ int __init_or_module do_one_initcall(initcall_t fn)
 
 	if (initcall_blacklisted(fn))
 		return -EPERM;
-
-	{
-		extern int t58_canary_off;
-		if (!t58_canary_off) {
-			static int t58_ic_count;
-			if (++t58_ic_count == T58_IC_N)
-				t58_stage_hit(60);
-		}
-	}
 
 	do_trace_initcall_start(fn);
 	ret = fn();
@@ -1202,7 +1176,6 @@ static noinline void __init kernel_init_freeable(void)
 	page_alloc_init_late();
 	/* Initialize page ext after all struct pages are initialized. */
 	page_ext_init();
-	t58_stage_hit(9);
 
 	do_basic_setup();
 
