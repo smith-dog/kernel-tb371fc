@@ -126,6 +126,14 @@ dtbo 组合），不必依赖任何旧版纯净包：
    `<纯基底.img> <Image> <out.img>`——它先断言基底 ramdisk 内没有 `kernelsu.ko`，
    再从**输出字节**读回内嵌 Image 的 md5 与 ramdisk 清单（Release v2.0 的 pure 资产即由它产出）。
 
+**自己 insmod KernelSU LKM** 的，用 Release v2.0 的
+[`ksu-v2.0.ko`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v2.0/ksu-v2.0.ko)
+（305608 B，md5 `e451369be5765ad517312e9f545698f0`，与 kspatched 镜像 ramdisk 内嵌那枚**字节相同**，
+vermagic `4.19.325-perf++ SMP preempt mod_unload modversions aarch64`）。
+⚠ v1.5 及更早的 `ksu-v27n*.ko` vermagic 仍是 `4.19.198-perf++`，且 `CONFIG_MODVERSIONS=y` 要求符号 CRC
+对上本版构建——老 `.ko` 在本内核上直接 `Invalid module format`。管理器 APK 不用换：
+`KERNEL_SU_UAPI_VERSION` 仍是 4，本版 `drivers/kernelsu/` 只改了 `kernel_compat.h` 的 16 行构建修复。
+
 </details>
 
 ---
