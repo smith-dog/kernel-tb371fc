@@ -38,7 +38,10 @@ upgrades never require a kernel rebuild.
 - **系统兼容**：VINTF 兼容（消除开机"设备内部出现问题"弹窗）、睡眠（deep suspend）
 - **内核基线（v2.0）**：linux-stable **v4.19.157 → v4.19.325** 完整采纳（168 个
   stable 发布；相对上一次发布共 121 个提交进 `main`），采纳范围内逐文件按三方比对定案，厂商私有
-  机制（`use_out_ep`/`bound` 通知、EOPFEN 拆分、`mb()` 写 TRB 等）保留而非覆盖
+  机制（`use_out_ep`/`bound` 通知、EOPFEN 拆分、`mb()` 写 TRB 等）保留而非覆盖。
+  ⚠ 顺带纠正一处历史误标：**v1.x 横幅上的 `4.19.198` 是早期任务手改 `Makefile SUBLEVEL`
+  得到的假版本号，当时树内代码实为 4.19.157**（与 TB371FC stock 同版本）。本版起
+  横幅 `4.19.325-perf++` 与 `SUBLEVEL = 325` 与实际采纳内容一致
 - **v2.0 顺手修掉的厂商缺陷**（都是"整批吃 stable"才暴露的）：`f_ncm` 第二实例
   错误路径解引用共享 uevent 设备指针（开机 26 s panic）→ 修；driver-core
   `device_links_purge` 裸 `list_del` 让每次正常 `device_del` 都打印
