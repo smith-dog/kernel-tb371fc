@@ -1247,17 +1247,25 @@ static int mmc_mrq_prep(struct mmc_host *host, struct mmc_request *mrq)
 int mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 {
 	int err;
-	#ifdef CONFIG_MMC_SDHCI_MSM_BH201
-	struct sdhci_host * host_sdhci = mmc_priv(host);
+
 	init_completion(&mrq->cmd_completion);
 
 	mmc_retune_hold(host);
-	//Add by ZhaoZiqiang for timeout controller register setting debug begin
-	if (sdhci_readb(host_sdhci, SDHCI_TIMEOUT_CONTROL)!= 0xE)
+	/*
+	 * Keep the vendor debug read scoped to its own symbol: CONFIG_MMC_SDHCI_MSM_BH201
+	 * has no Kconfig entry anywhere in this tree, so an #ifdef around the statements
+	 * above silently deletes the retune hold that mmc_wait_for_req_done() releases.
+	 */
+	#ifdef CONFIG_MMC_SDHCI_MSM_BH201
 	{
-		pr_info("TEST_print: host reg SDHCI_TIMEOUT_CONTROL is 0x%X\n", sdhci_readb(host_sdhci, SDHCI_TIMEOUT_CONTROL));
+		struct sdhci_host * host_sdhci = mmc_priv(host);
+		//Add by ZhaoZiqiang for timeout controller register setting debug begin
+		if (sdhci_readb(host_sdhci, SDHCI_TIMEOUT_CONTROL)!= 0xE)
+		{
+			pr_info("TEST_print: host reg SDHCI_TIMEOUT_CONTROL is 0x%X\n", sdhci_readb(host_sdhci, SDHCI_TIMEOUT_CONTROL));
+		}
+		//Add by ZhaoZiqiang for timeout controller register setting debug end
 	}
-	//Add by ZhaoZiqiang for timeout controller register setting debug end
 	#endif
 
 	if (mmc_card_removed(host->card))
