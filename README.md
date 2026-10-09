@@ -73,15 +73,20 @@ Full patch history in
 
 > 前提：Bootloader 已解锁（`fastboot flashing unlock`）。
 
-**一个镜像即完成全部安装（v1.5 起的形态，v2.0 沿用）。**
+**一枚内核、两种 root 形态，各一个镜像即完成全部安装（v1.5 起的形态，v2.0 沿用）。**
 
 1. 从 [Release v2.0](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v2.0)
-   下载 [`boot-v2.0-kspatched-flash.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v2.0/boot-v2.0-kspatched-flash.img)
-   （md5 `b7f5b9284a14c8faabb0a6f6c7d379f6`）——KernelSU LKM 已内置，直刷即有 root
+   下载下列其一——两个镜像内嵌的 Image **字节相同**（同一枚 `#312`），只差 ramdisk 里
+   有没有 KernelSU：
+   - [`boot-v2.0-kspatched-flash.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v2.0/boot-v2.0-kspatched-flash.img)
+     （md5 `b7f5b9284a14c8faabb0a6f6c7d379f6`）——KernelSU LKM 已内置，直刷即有 root
+   - [`boot-v2.0-pure-flash.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v2.0/boot-v2.0-pure-flash.img)
+     （md5 `9ec79818758d2b7a753e8dea381b64ab`）——纯净版：原厂 v27n89 ramdisk，
+     不含 KernelSU/ksud（给 APatch 等自带 root 方案，或不需要 root 的用法）
 2. 刷入并重启（`fastboot` 走 USB，刷前核对 `fastboot getvar current-slot`）：
    ```
    adb reboot bootloader
-   fastboot flash boot boot-v2.0-kspatched-flash.img
+   fastboot flash boot boot-v2.0-kspatched-flash.img   # 或 boot-v2.0-pure-flash.img
    fastboot reboot
    ```
 3. 完成。开机后 `/proc/version` 应为 `Linux version 4.19.325-perf++ ... #312`。
@@ -106,14 +111,20 @@ adb shell "su -c 'sh /data/local/tmp/tb371fc-payload-cleanup.sh'"
 <details>
 <summary>备选方法（要换 root 方案 / 想自己打镜像：用本仓库 tools 重打包）</summary>
 
-v2.0 只发布 kspatched 一个镜像（内置 KernelSU LKM）。若要 APatch/纯内核形态，
-自己把内核 Image 打进你的基底镜像即可，不依赖任何旧版纯净包：
+v2.0 除 kspatched 镜像外也直接发布纯净镜像 `boot-v2.0-pure-flash.img`（同一枚 `#312`
+Image + 原厂 v27n89 无 KSU ramdisk）。若要把它打进你自己的基底镜像（换 ramdisk /
+dtbo 组合），不必依赖任何旧版纯净包：
 
-1. 按下面「自己编译」构建出 `arch/arm64/boot/Image`（或直接取 Release 内
-   `boot-v2.0-kspatched-flash.img` 拆出的 Image），
+1. 按下面「自己编译」构建出 `arch/arm64/boot/Image`（或直接取 Release 内任一镜像
+   拆出的 Image，两者字节相同），
 2. 用 [`tb371fc/tools/repack_boot.py`](tb371fc/tools/repack_boot.py) 保留 v2 头 /
    ramdisk / DTB 尾打进你的基底镜像（原厂 `dtb_size` quirk 已在工具内修正），
 3. `fastboot flash boot <out.img>` + `fastboot reboot`。
+
+   只想复刻本次出货的那枚 pure 镜像，直接跑
+   [`tb371fc/scripts/repack-pure-boot.sh`](tb371fc/scripts/repack-pure-boot.sh)
+   `<纯基底.img> <Image> <out.img>`——它先断言基底 ramdisk 内没有 `kernelsu.ko`，
+   再从**输出字节**读回内嵌 Image 的 md5 与 ramdisk 清单（Release v2.0 的 pure 资产即由它产出）。
 
 </details>
 
