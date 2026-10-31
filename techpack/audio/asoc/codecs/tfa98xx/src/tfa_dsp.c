@@ -3136,15 +3136,12 @@ int tfa_reset(struct tfa_device *tfa)
 		tfa98xx_powerdown(tfa, 0 );
 		/* for clock */
 		err = tfa_cf_powerup(tfa);
-		PRINT_ASSERT(err);
 
 		/* force cold boot */
 		err = tfaRunColdboot(tfa, 1); // set ACS
-		PRINT_ASSERT(err);
 
 		/* reset all i2C registers to default */
 		err = -TFA_SET_BF(tfa, I2CR, 1);
-		PRINT_ASSERT(err);
 	} else {
 		if (tfa->ext_dsp > 0)
 			tfa98xx_init_dsp(tfa);

@@ -40,7 +40,6 @@
 /* required for enum tfa9912_irq */
 #include "../inc/tfa98xx_tfafieldnames.h"
 
-#include "../inc/spk-id.h"
 
 #define TFA98XX_VERSION	TFA98XX_API_REV_STR
 
@@ -148,61 +147,6 @@ static const struct tfa98xx_rate rate_to_fssel[] = {
 	{ 48000, 8 },
 };
 
-int nxp_spk_id_get(struct device_node *np)
-{
-	int id = VENDOR_ID_UNKNOWN;
-	int state = 3;
-
-	/*state = spk_id_get_pin_3state(np);
-	if (state < 0) {
-		pr_err("%s: Can not get id pin state, %d\n", __func__, state);
-		return VENDOR_ID_NONE;
-	}*/
-
-	switch (state) {
-	case PIN_PULL_DOWN:
-		id = VENDOR_ID_GOER;
-		break;
-	case PIN_PULL_UP:
-		id = VENDOR_ID_UNKNOWN;
-		break;
-	case PIN_FLOAT:
-		id = VENDOR_ID_AAC;
-		break;
-	default:
-		id = VENDOR_ID_NONE;
-		break;
-	}
-	return id;
-}
-
-static int nxp_vendor_id_get(struct snd_kcontrol *kcontrol,
-					struct snd_ctl_elem_value *ucontrol)
-{
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,18,0)
-	struct snd_soc_component *codec = snd_soc_kcontrol_component(kcontrol);
-	struct tfa98xx *tfa98xx = snd_soc_component_get_drvdata(codec);
-#else
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct tfa98xx *tfa98xx = snd_soc_codec_get_drvdata(codec);
-#endif
-	ucontrol->value.integer.value[0] = VENDOR_ID_NONE;
-
-	if (tfa98xx->spk_id_gpio_p)
-		ucontrol->value.integer.value[0] = nxp_spk_id_get(tfa98xx->spk_id_gpio_p);
-
-	return 0;
-}
-
-static const char *const nxp_vendor_id_text[] = {"None", "AAC", "SSI", "GOER", "Unknown"};
-
-static const struct soc_enum nxp_vendor_id[] = {
-	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(nxp_vendor_id_text), nxp_vendor_id_text),
-};
-
-const struct snd_kcontrol_new nxp_spk_id_controls[] ={
-	SOC_ENUM_EXT("SPK ID", nxp_vendor_id, nxp_vendor_id_get, NULL),
-};
 
 static int tfa9894_get_chan_sel_ctl(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
@@ -1172,21 +1116,6 @@ static int get_profile_id_for_sr(int id, unsigned int rate)
 	return -1;
 }
 
-static int get_profile_id_by_name(char *profile, int len)
-{
-	struct tfa98xx_baseprofile *bprof;
-	int prof_index = -1;
-
-	list_for_each_entry(bprof, &profile_list, list) {
-		if (strncmp(profile, bprof->basename, len) == 0) {
-			prof_index = bprof->item_id;
-			break;
-		}
-	}
-
-	return prof_index;
-}
-
 /* check if this profile is a calibration profile */
 static int is_calibration_profile(char *profile)
 {
@@ -1554,51 +1483,6 @@ static int tfa98xx_set_stop_ctl(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
-static int tfa98xx_info_PAmute(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_info *uinfo)
-{
-	mutex_lock(&tfa98xx_mutex);
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
-	uinfo->count = tfa98xx_device_count;
-	uinfo->value.integer.min = TFA98XX_DEVICE_MUTE_OFF;
-	uinfo->value.integer.max = TFA98XX_DEVICE_MUTE_ON;
-	mutex_unlock(&tfa98xx_mutex);
-
-	return 0;
-}
-
-static int tfa98xx_get_PAmute(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
-{
-	struct tfa98xx *tfa98xx = NULL;
-
-	mutex_lock(&tfa98xx_mutex);
-	list_for_each_entry(tfa98xx, &tfa98xx_device_list, list) {
-		ucontrol->value.integer.value[tfa98xx->tfa->dev_idx] = tfa98xx->tfa_mute_mode;
-	}
-	mutex_unlock(&tfa98xx_mutex);
-
-	return 0;
-}
-
-static int tfa98xx_set_PAmute(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
-{
-	struct tfa98xx *tfa98xx = NULL;
-
-	mutex_lock(&tfa98xx_mutex);
-	list_for_each_entry(tfa98xx, &tfa98xx_device_list, list) {
-		if (ucontrol->value.integer.value[tfa98xx->tfa->dev_idx] != TFA98XX_DEVICE_MUTE_OFF) {
-			tfa98xx->tfa_mute_mode = TFA98XX_DEVICE_MUTE_ON;
-		} else {
-			tfa98xx->tfa_mute_mode = TFA98XX_DEVICE_MUTE_OFF;
-		}
-	}
-	mutex_unlock(&tfa98xx_mutex);
-
-	return 1;
-}
-
 static int tfa98xx_info_cal_ctl(struct snd_kcontrol *kcontrol,
 		                struct snd_ctl_elem_info *uinfo)
 {
@@ -1775,16 +1659,6 @@ static int tfa98xx_create_controls(struct tfa98xx *tfa98xx)
 	tfa98xx_controls[mix_index].get = tfa98xx_get_profile;
 	tfa98xx_controls[mix_index].put = tfa98xx_set_profile;
 	// tfa98xx_controls[mix_index].private_value = profs; /* save number of profiles */
-	mix_index++;
-	/* add new mixer control item 'SmartPA Mute' for MAX2 device. */
-	if (tfa98xx->tfa->tfa_family == 2) {
-		tfa98xx_controls[mix_index].name = "SmartPA Mute";
-		tfa98xx_controls[mix_index].iface = SNDRV_CTL_ELEM_IFACE_MIXER;
-		tfa98xx_controls[mix_index].info = tfa98xx_info_PAmute;
-		tfa98xx_controls[mix_index].get	= tfa98xx_get_PAmute;
-		tfa98xx_controls[mix_index].put	= tfa98xx_set_PAmute;
-		mix_index++;
-	}
 
 	/* create mixer items for each profile that has volume */
 	for (prof = 0; prof < nprof; prof++) {
@@ -1888,10 +1762,6 @@ static int tfa98xx_create_controls(struct tfa98xx *tfa98xx)
 	ret = snd_soc_add_component_controls(tfa98xx->component, tfa987x_algo_controls, ARRAY_SIZE(tfa987x_algo_controls));
 	pr_debug("create tfa987x_algo_controls  ret=%d", ret);
 #endif
-	if (!ret) {
-		ret = snd_soc_add_component_controls(tfa98xx->component,
-				nxp_spk_id_controls, ARRAY_SIZE(nxp_spk_id_controls));
-	}
 	if (!ret && (tfa98xx->tfa->tfa_family == 2) &&
 	    ((tfa98xx->tfa->rev & 0xff) == 0x94)) {
 		ret = snd_soc_add_component_controls(tfa98xx->component,
@@ -1906,10 +1776,6 @@ static int tfa98xx_create_controls(struct tfa98xx *tfa98xx)
 	ret = snd_soc_add_codec_controls(tfa98xx->codec, tfa987x_algo_controls, ARRAY_SIZE(tfa987x_algo_controls));
 	pr_debug("create tfa987x_algo_controls  ret=%d", ret);
 #endif
-	if (!ret) {
-		ret = snd_soc_add_codec_controls(tfa98xx->codec,
-				nxp_spk_id_controls, ARRAY_SIZE(nxp_spk_id_controls));
-	}
 	if (!ret && (tfa98xx->tfa->tfa_family == 2) &&
 	    ((tfa98xx->tfa->rev & 0xff) == 0x94)) {
 		ret = snd_soc_add_codec_controls(tfa98xx->codec,
@@ -3359,694 +3225,6 @@ static struct bin_attribute dev_attr_reg = {
 	.write = tfa98xx_reg_write,
 };
 
-static int tfa98xx_misc_device_profile_open(struct inode *inode, struct file *file)
-{
-	struct tfa98xx *tfa98xx = container_of(file->private_data,
-					struct tfa98xx, tfa98xx_profile);
-	if (tfa98xx) {
-		file->private_data = tfa98xx;
-		return 0;
-	} else {
-		file->private_data = NULL;
-		return -EINVAL;
-	}
-}
-
-static ssize_t tfa98xx_misc_device_profile_write(struct file *file, const char __user *user_buf,
-						size_t count, loff_t *ppos)
-{
-	struct tfa98xx *tfa98xx = file->private_data;
-	char name[100] = { 0 };
-	int ret = 0;
-	int profileID = 0;
-
-
-	if (NULL == tfa98xx) {
-		return -EINVAL;
-	}
-	/*if (count != 1) {
-		return -EINVAL;
-	}*/
-	memset(name, 0x00, sizeof(name));
-	ret = copy_from_user(name, user_buf, count);
-
-	/* search profile name and return ID. */
-	profileID = get_profile_id_by_name(name, strlen(name));
-	if (profileID < 0) {
-		return 0;
-	} else {
-		int prof_idx = get_profile_id_for_sr(profileID, tfa98xx->rate);
-		if (prof_idx < 0) {
-			return 0;
-		} else {
-			tfa98xx_mixer_profile = profileID;
-			tfa98xx->profile = prof_idx;
-			tfa98xx->vstep = tfa98xx->prof_vsteps[prof_idx];
-		}
-	}
-
-	return count;
-}
-
-static int tfa98xx_misc_device_reg_open(struct inode *inode, struct file *file)
-{
-	struct tfa98xx *tfa98xx = container_of(file->private_data,
-					struct tfa98xx, tfa98xx_reg);
-	if (tfa98xx) {
-		file->private_data = tfa98xx;
-		return 0;
-	} else {
-		file->private_data = NULL;
-		return -EINVAL;
-	}
-}
-
-static ssize_t tfa98xx_misc_device_reg_write(struct file *file, const char __user *user_buf,
-					size_t count, loff_t *ppos)
-{
-	struct tfa98xx *tfa98xx = file->private_data;
-	u8 address = 0;
-	int ret = 0;
-
-
-	if (NULL == tfa98xx) {
-		return -EINVAL;
-	}
-
-	if (count != 1) {
-		return -EINVAL;
-	}
-
-	ret = copy_from_user(&address, user_buf, count);
-	if (ret) {
-	}
-
-	tfa98xx->reg = address;
-
-	return count;
-}
-
-static int tfa98xx_misc_device_rw_open(struct inode *inode, struct file *file)
-{
-	struct tfa98xx *tfa98xx = container_of(file->private_data,
-					struct tfa98xx, tfa98xx_rw);
-	if (tfa98xx) {
-		file->private_data = tfa98xx;
-		return 0;
-	} else {
-		file->private_data = NULL;
-		return -EINVAL;
-	}
-}
-
-static ssize_t tfa98xx_misc_device_rw_read(struct file *file, char __user *user_buf,
-					size_t count, loff_t *ppos)
-{
-	struct tfa98xx *tfa98xx = file->private_data;
-	struct i2c_msg msgs[] = {
-		{
-			.addr = tfa98xx->i2c->addr,
-			.flags = 0,
-			.len = 1,
-			.buf = &tfa98xx->reg,
-		},
-		{
-			.addr = tfa98xx->i2c->addr,
-			.flags = I2C_M_RD,
-			.len = count,
-			.buf = NULL,
-		},
-	};
-
-	u8 *data;
-	int ret;
-	int retries = I2C_RETRIES;
-
-
-	data = kmalloc(count+1, GFP_KERNEL);
-	if (data == NULL) {
-		return  -ENOMEM;
-	}
-
-	msgs[1].buf = data;
-
-retry:
-	ret = i2c_transfer(tfa98xx->i2c->adapter, msgs, ARRAY_SIZE(msgs));
-
-	if (ret < 0) {
-		pr_warn("i2c error, retries left: %d\n", retries);
-		if (retries) {
-			retries--;
-			msleep(I2C_RETRY_DELAY);
-			goto retry;
-		}
-
-		kfree(data);
-		return ret;
-	} else if (ret > 1) {
-		int ret_cpy = copy_to_user(user_buf, data, count);
-		if (ret_cpy) {
-		}
-	}
-
-	/* ret contains the number of i2c transaction */
-	/* return the number of bytes read */
-	kfree(data);
-	return ((ret > 1) ? count : -EIO);
-}
-
-static ssize_t tfa98xx_misc_device_rw_write(struct file *file, const char __user *user_buf,
-					size_t count, loff_t *ppos)
-{
-	struct tfa98xx *tfa98xx = file->private_data;
-	u8 *data;
-	int ret;
-	int retries = I2C_RETRIES;
-
-	data = kmalloc(count+1, GFP_KERNEL);
-	if (data == NULL) {
-		return  -ENOMEM;
-	}
-
-
-	data[0] = tfa98xx->reg;
-	if (copy_from_user(&data[1], user_buf, count)) {
-	}
-
-
-retry:
-	ret = i2c_master_send(tfa98xx->i2c, data, count+1);
-	if (ret < 0) {
-		pr_warn("i2c error, retries left: %d\n", retries);
-		if (retries) {
-			retries--;
-			msleep(I2C_RETRY_DELAY);
-			goto retry;
-		}
-	}
-
-	kfree(data);
-
-	/* the number of data bytes written without the register address */
-	return ((ret > 1) ? count : -EIO);
-}
-
-static int tfa98xx_misc_device_rpc_open(struct inode *inode, struct file *file)
-{
-	struct tfa98xx *tfa98xx = container_of(file->private_data,
-					struct tfa98xx, tfa98xx_rpc);
-	if (tfa98xx) {
-		file->private_data = tfa98xx;
-		return 0;
-	} else {
-		file->private_data = NULL;
-		return -EINVAL;
-	}
-}
-
-static ssize_t tfa98xx_misc_device_rpc_read(struct file *file, char __user *user_buf,
-											size_t count, loff_t *ppos)
-{
-	struct tfa98xx *tfa98xx = file->private_data;
-	uint8_t *buffer = NULL;
-    int ret = 0;
-
-	buffer = kmalloc(count, GFP_KERNEL);
-	if (buffer == NULL) {
-		return -ENOMEM;
-	}
-
-	mutex_lock(&tfa98xx->dsp_lock);
-
-	ret = send_tfa_cal_apr(buffer, count, true);
-
-	mutex_unlock(&tfa98xx->dsp_lock);
-	if (ret) {
-		pr_err("[0x%x] dsp_msg_read error: %d\n", tfa98xx->i2c->addr, ret);
-		kfree(buffer);
-		return -EFAULT;
-	}
-
-	ret = copy_to_user(user_buf, buffer, count);
-	kfree(buffer);
-	if (ret)
-		return -EFAULT;
-
-	*ppos += count;
-	return count;
-}
-
-static ssize_t tfa98xx_misc_device_rpc_write(struct file *file, const char __user *user_buf,
-											size_t count, loff_t *ppos)
-{
-	struct tfa98xx *tfa98xx = file->private_data;
-	uint8_t *buffer;
-	int err = 0;
-
-	if (count == 0)
-		return 0;
-
-	/* msg_file.name is not used */
-	buffer = kmalloc(count, GFP_KERNEL);
-	if ( buffer == NULL ) {
-		return  -ENOMEM;
-	}
-	if (copy_from_user(buffer, user_buf, count))
-		return -EFAULT;
-
-	mutex_lock(&tfa98xx->dsp_lock);
-
-	err = send_tfa_cal_apr(buffer, count, false);
-	if (err) {
-		pr_err("[0x%x] dsp_msg error: %d\n", tfa98xx->i2c->addr, err);
-	}
-
-	mdelay(2);
-
-	mutex_unlock(&tfa98xx->dsp_lock);
-
-	kfree(buffer);
-
-	if (err)
-		return err;
-	return count;
-}
-
-enum Tfa98xx_Error tfa98xx_read_data_from_hostdsp(struct tfa_device *tfa,
-												unsigned char module_id,
-												unsigned char param_id, int num_bytes,
-												unsigned char data[])
-{
-	int error;
-	unsigned char buffer[3];
-	int nr = 0;
-
-	if (num_bytes <= 0) {
-		return Tfa98xx_Error_Fail;
-	}
-
-	if ((tfa->cnt->ndev == 1) &&
-		(param_id == SB_PARAM_GET_RE25C ||
-		param_id == SB_PARAM_GET_LSMODEL ||
-		param_id == SB_PARAM_GET_ALGO_PARAMS)) {
-
-		/* Modifying the ID for GetRe25C */
-		buffer[nr++] = 4;
-	} else {
-		buffer[nr++] = tfa->spkr_select;
-	}
-	buffer[nr++] = module_id + 128;
-	buffer[nr++] = param_id;
-
-	error = send_tfa_cal_apr(buffer, sizeof(buffer), false);
-	if (error)
-		return Tfa98xx_Error_Bad_Parameter;
-	mdelay(5);
-
-	/* read the data from the dsp */
-	error = send_tfa_cal_apr(data, sizeof(num_bytes), true);
-	if (error)
-		return Tfa98xx_Error_Bad_Parameter;
-	return Tfa98xx_Error_Ok;
-}
-
-static uint8_t send_to_dsp_count = 0;
-static int tfa98xx_read_memtrack_data(struct tfa98xx *tfa98xx, int *pLivedata)
-{
-	enum Tfa98xx_Error ret = Tfa98xx_Error_Ok;
-	/* the buffer is for stereo usecase. */
-	char buffer[(2 + (MEMTRACK_ITEM_MAX * 2)) * 3] = {0};
-	int item_bytes = MEMTRACK_ITEM_MAX * 3;   /* mono case by default.*/
-
-	enum TFA_DEVICE_TYPE pri_devcie = TFA_DEVICE_TYPE_MAX;
-	enum TFA_DEVICE_TYPE sec_devcie = TFA_DEVICE_TYPE_MAX;
-	/* TFA device memory map. */        
-	struct livedata_cfg livedata_table[TFA_DEVICE_TYPE_MAX][MEMTRACK_ITEM_MAX] = {
-		/* for TFA9894 device */
-		{
-			{0x6fc, 0x02, 0x0001},  /* fRes_P */
-			{0x705, 0x02, 0x4000},  /* T_P */
-			{0x70b, 0x02, 0x10000},  /* ReT_P */
-		},
-#ifdef NXP_SPEAKERBOOST_V3
-		/* for TFA9874 primary channel */
-		{
-			{0x34, 0x22, 0x0001},  /* fRes_P */
-			{0x6, 0x22, 0x4000},  /* T_P */
-			{0x2, 0x22, 0x10000},  /* ReT_P */
-		},
-
-		/* for TFA9874 secondary channel */
-		{
-			{0x35, 0x22, 0x0001},  /* fRes_S */
-			{0x7, 0x22, 0x4000},  /* T_S */
-			{0x3, 0x022, 0x10000},  /* ReT_S */
-		},
-#else
-		/* for TFA9874 primary channel */
-		{
-			{0x310, 0x02, 0x0001},  /* fRes_P */
-			{0x319, 0x02, 0x4000},  /* T_P */
-			{0x31f, 0x02, 0x10000},  /* ReT_P */
-		},
-
-		/* for TFA9874 secondary channel */
-		{
-			{0x64c, 0x02, 0x0001},  /* fRes_S */
-			{0x655, 0x02, 0x4000},  /* T_S */
-			{0x65b, 0x02, 0x10000},  /* ReT_S */
-		},
-#endif
-	};
-
-	mutex_lock(&tfa98xx->dsp_lock);
-	switch (tfa98xx->tfa->rev & 0xff) {
-		case 0x74:
-			pri_devcie = TFA_DEVICE_TYPE_9874_PRIMARY;
-			sec_devcie = TFA_DEVICE_TYPE_9874_SECONDARY;
-			break;
-		case 0x94:
-			/* TFA9894 is single-channel: there is no secondary
-			 * channel, so sec_devcie deliberately stays at
-			 * TFA_DEVICE_TYPE_MAX and the stereo branch below
-			 * must not index the table with it. */
-			pri_devcie = TFA_DEVICE_TYPE_9894;
-			break;
-		default:
-			ret = Tfa98xx_Error_Device;
-			goto err;
-	}
-
-	/* check DSP status. we can read memtrack data once DSP is running. */
-	if ((TFA_GET_BF(tfa98xx->tfa, MANSTATE) != 9) || (TFA_GET_BF(tfa98xx->tfa, CFE) == 0)) {
-		ret = Tfa98xx_Error_DSP_not_running;
-		goto err;
-	}
-
-#ifdef NXP_SPEAKERBOOST_V3
-	pr_debug("Read livedata from Speakerboost 3.0\n");
-#else
-#endif
-
-	if (2 == tfa98xx->tfa->tfa_family) {
-		int i = 0, j = 0;
-
-		/* step 1: set livedata items. */
-		memset(&buffer[0], 0x00, sizeof(buffer));
-
-		/* For every item take the tracker and add this infront of the adress */
-		if (tfa98xx->tfa->is_probus_device) { /* for none-dsp device. */
-			/* because our algorithm can support mono/stereo use case.
-			   if device count is more than 1, we will build stereo struct and send to dsp next time. */
-			if ((tfa98xx_device_count > 1) && (0 == send_to_dsp_count)) {
-				send_to_dsp_count++;
-				ret = Tfa98xx_Error_Ok;
-				goto err;
-			}
-		}
-
-		/* build primary channel struct. */
-		for (i = 0; i < MEMTRACK_ITEM_MAX*3; i+=3) {
-			buffer[i+6] = (uint8_t)(livedata_table[pri_devcie][j].track & 0xff);
-			buffer[i+7] = (uint8_t)((livedata_table[pri_devcie][j].address >> 8) & 0xff);
-			buffer[i+8] = (uint8_t)(livedata_table[pri_devcie][j].address & 0xff);
-			j++;
-		}
-
-		/* build secondary channel struct. */
-		/* TFA9894 is single-channel: sec_devcie stays at
-		 * TFA_DEVICE_TYPE_MAX, so there is no secondary row to read.
-		 * Indexing livedata_table with MAX would walk off the array. */
-		if ((tfa98xx_device_count > 1) && (sec_devcie != TFA_DEVICE_TYPE_MAX)) {
-			j = 0;
-			for (i = MEMTRACK_ITEM_MAX*3; i < MEMTRACK_ITEM_MAX*6; i+=3) {
-				buffer[i+6] = (uint8_t)(livedata_table[sec_devcie][j].track & 0xff);
-				buffer[i+7] = (uint8_t)((livedata_table[sec_devcie][j].address >> 8) & 0xff);
-				buffer[i+8] = (uint8_t)(livedata_table[sec_devcie][j].address & 0xff);
-				j++;
-			}
-
-			item_bytes *= 2; /* re-calculate item length for stereo usecase. */
-		}
-
-		/* copy the msg_id to buffer */
-		buffer[0] = 0;
-		buffer[1] = MODULE_FRAMEWORK + 128;
-		buffer[2] = FW_PAR_ID_SET_MEMTRACK;
-
-		/* Then copy the length (number of memtrack items) */
-		buffer[3] = (uint8_t) ((item_bytes >> 16) & 0xffff);
-		buffer[4] = (uint8_t) ((item_bytes >> 8) & 0xff);
-		buffer[5] = (uint8_t) (item_bytes & 0xff);
-
-		/* send command to host dsp. */
-        if (tfa98xx->tfa->is_probus_device) {
-            send_tfa_cal_apr(buffer, item_bytes + 6, false);
-			send_to_dsp_count = 0;
-			mdelay(5);
-        } else {
-		ret = dsp_msg(tfa98xx->tfa, item_bytes + 6, buffer);
-        }
-
-		if (Tfa98xx_Error_Ok == ret) {
-			/* step 2: read livedata from dsp. */
-			memset(&buffer[0], 0x00, sizeof(buffer));
-
-			/*Length = nr of items * 3 bytes (24bit dsp) + 3 bytes for Elapsed time (first 3 bytes)*/
-			if (tfa98xx->tfa->is_probus_device) {
-				ret = tfa98xx_read_data_from_hostdsp(tfa98xx->tfa, MODULE_FRAMEWORK, FW_PAR_ID_GET_MEMTRACK, item_bytes+3, buffer);
-			} else {
-				ret = tfa_dsp_cmd_id_write_read(tfa98xx->tfa, MODULE_FRAMEWORK, FW_PAR_ID_GET_MEMTRACK, item_bytes+3, buffer);
-			}
-			
-
-			if (Tfa98xx_Error_Ok == ret) {
-				/* Skip the first 3 bytes (this is the Elapsed time, not memtrack data) */
-				tfa98xx_convert_bytes2data(item_bytes, &buffer[3], pLivedata);
-			} else {
-				ret = Tfa98xx_Error_Other;
-			}
-		} else {
-			ret = Tfa98xx_Error_Other;
-		}
-	} else {
-		ret = Tfa98xx_Error_Other;
-	}
-
-err:
-	mutex_unlock(&tfa98xx->dsp_lock);
-	return ret;
-}
-
-static int tfa98xx_misc_device_control_open(struct inode *inode, struct file *file)
-{
-	struct tfa98xx *tfa98xx = container_of(file->private_data,
-					struct tfa98xx, tfa98xx_control);
-	if (tfa98xx) {
-		file->private_data = tfa98xx;
-		return 0;
-	} else {
-		file->private_data = NULL;
-		return -EINVAL;
-	}
-}
-
-static long tfa98xx_misc_device_control_ioctl(struct file *file,
-												unsigned int cmd,
-												unsigned long arg)
-{
-	struct tfa98xx *tfa98xx = NULL;
-	int result = 0;
-
-	if (!arg) {
-		return -EINVAL;
-	}
-
-	switch (cmd) {
-		case IOCTL_CMD_GET_MEMTRACK_DATA: {
-			int livedata[MEMTRACK_ITEM_MAX * 2];
-			int livedata_length_bytes = 0;
-			void *pUserData = (void*)arg;
-			list_for_each_entry(tfa98xx, &tfa98xx_device_list, list) {
-				int per_dev_bytes;
-
-				/* clear buffer and read livedata from dsp.*/
-				memset((char*)(&livedata[0]), 0x00, sizeof(livedata));
-				if (Tfa98xx_Error_Ok ==
-					   tfa98xx_read_memtrack_data(tfa98xx, &livedata[0])) {
-					per_dev_bytes = sizeof(int) * MEMTRACK_ITEM_MAX;
-				} else {
-					per_dev_bytes = sizeof(int) * MEMTRACK_ITEM_MAX;
-				}
-
-				/* copy data to user spcace. if copied is successed,
-				will be returned actual size to user space. */
-				livedata_length_bytes = per_dev_bytes;
-				if ((tfa98xx->tfa->is_probus_device) && (tfa98xx_device_count > 1)) {
-					/* for stereo usecase, if the condition is true, we have already got livedata from host DSP.
-					otherwise, we don't need do anything. */
-					if (send_to_dsp_count == 0) {
-						livedata_length_bytes *= 2;
-					} else {
-						livedata_length_bytes = 0;
-					}
-				}
-
-				if (livedata_length_bytes != 0) {
-					int cpy = copy_to_user((void __user *)pUserData,
-							       &livedata[0],
-							       livedata_length_bytes);
-					if (cpy) {
-						result = -EINVAL;
-						break;
-					} else {
-						result += livedata_length_bytes;
-					}
-					pUserData += livedata_length_bytes;
-				}
-			}
-			break;
-		}
-		case IOCTL_CMD_GET_CNT_VERSION: {
-			void *pUserData = (void*)arg;
-
-			if (NULL != tfa98xx_container) {
-				result = copy_to_user((void __user *)pUserData, tfa98xx_container->type, strlen(tfa98xx_container->type));
-				if (result) {
-				} else {
-					result = strlen(tfa98xx_container->type);
-				}
-			} else {
-				result = -EINVAL;
-			}
-			break;
-		}
-		default:
-			result = -EINVAL;
-			break;
-	}
-
-	return result;
-}
-
-#ifdef CONFIG_COMPAT
-static long tfa98xx_misc_device_control_compat_ioctl(struct file *file,
-													unsigned int cmd,
-													unsigned long arg)
-{
-
-	if (!arg) {
-		return -EINVAL;
-	}
-
-	return tfa98xx_misc_device_control_ioctl(file, cmd, arg);
-}
-#endif
-
-
-static const struct tfa98xx_miscdevice_info miscdevice_info[MISC_DEVICE_MAX] = {
-	{
-		.devicename = "tfa_reg",
-		.operations.owner = THIS_MODULE,
-		.operations.open = tfa98xx_misc_device_reg_open,
-		.operations.write = tfa98xx_misc_device_reg_write,
-	},
-	{
-		.devicename = "tfa_rw",
-		.operations.owner = THIS_MODULE,
-		.operations.open = tfa98xx_misc_device_rw_open,
-		.operations.read = tfa98xx_misc_device_rw_read,
-		.operations.write = tfa98xx_misc_device_rw_write,
-	},
-	{
-		.devicename = "tfa_rpc",
-		.operations.owner = THIS_MODULE,
-		.operations.open = tfa98xx_misc_device_rpc_open,
-		.operations.read = tfa98xx_misc_device_rpc_read,
-		.operations.write = tfa98xx_misc_device_rpc_write,
-	},
-	{
-		.devicename = "tfa_profile",
-		.operations.owner = THIS_MODULE,
-		.operations.open = tfa98xx_misc_device_profile_open,
-		.operations.write = tfa98xx_misc_device_profile_write,
-	},
-	{
-		.devicename = "tfa_control",
-		.operations.owner = THIS_MODULE,
-		.operations.open = tfa98xx_misc_device_control_open,
-		.operations.unlocked_ioctl = tfa98xx_misc_device_control_ioctl,
-#ifdef CONFIG_COMPAT		
-		.operations.compat_ioctl = tfa98xx_misc_device_control_compat_ioctl,
-#endif		
-	},
-};
-
-int tfa98xx_init_misc_device(struct tfa98xx *tfa98xx)
-{
-	int ret = 0;
-		
-	if (NULL == tfa98xx) {
-		return -EINVAL;
-	}
-
-	//pr_debug("I2C bus=0x%x  address=0x%x\n", tfa98xx->i2c->adapter->nr, tfa98xx->i2c->addr);
-	/* create device node "tfa_reg_X" for write sub address. */
-	tfa98xx->tfa98xx_reg.minor = MISC_DYNAMIC_MINOR;
-	tfa98xx->tfa98xx_reg.name = miscdevice_info[MISC_DEVICE_TFA98XX_REG].devicename;
-	tfa98xx->tfa98xx_reg.fops = &miscdevice_info[MISC_DEVICE_TFA98XX_REG].operations;
-	ret = misc_register(&tfa98xx->tfa98xx_reg);
-	if (ret) {
-	}
-
-	/* create device node "tfa_rw_X" for read/write i2c device. */
-	tfa98xx->tfa98xx_rw.minor = MISC_DYNAMIC_MINOR;
-	tfa98xx->tfa98xx_rw.name = miscdevice_info[MISC_DEVICE_TFA98XX_RW].devicename;
-	tfa98xx->tfa98xx_rw.fops = &miscdevice_info[MISC_DEVICE_TFA98XX_RW].operations;
-	ret = misc_register(&tfa98xx->tfa98xx_rw);
-	if (ret) {
-	}
-	
-	/* create device node "tfa_rpc_X" for switching profile. */
-	tfa98xx->tfa98xx_rpc.minor = MISC_DYNAMIC_MINOR;
-	tfa98xx->tfa98xx_rpc.name = miscdevice_info[MISC_DEVICE_TFA98XX_RPC].devicename;
-	tfa98xx->tfa98xx_rpc.fops = &miscdevice_info[MISC_DEVICE_TFA98XX_RPC].operations;
-	ret = misc_register(&tfa98xx->tfa98xx_rpc);
-	if (ret) {
-	}
-
-	/* create device node "tfa_profile_X" for switching profile. */
-	tfa98xx->tfa98xx_profile.minor = MISC_DYNAMIC_MINOR;
-	tfa98xx->tfa98xx_profile.name = miscdevice_info[MISC_DEVICE_TFA98XX_PROFILE].devicename;
-	tfa98xx->tfa98xx_profile.fops = &miscdevice_info[MISC_DEVICE_TFA98XX_PROFILE].operations;
-	ret = misc_register(&tfa98xx->tfa98xx_profile);
-	if (ret) {
-	}
-
-	/* create device node "tfa_control_X" for IO control. */
-	tfa98xx->tfa98xx_control.minor = MISC_DYNAMIC_MINOR;
-	tfa98xx->tfa98xx_control.name = miscdevice_info[MISC_DEVICE_TFA98XX_IOCTL].devicename;
-	tfa98xx->tfa98xx_control.fops = &miscdevice_info[MISC_DEVICE_TFA98XX_IOCTL].operations;
-	ret = misc_register(&tfa98xx->tfa98xx_control);
-	if (ret) {
-	}
-
-	return ret;
-}
-
-void tfa98xx_remove_misc_device(struct tfa98xx *tfa98xx)
-{
-	if (NULL == tfa98xx) {
-		return;
-	}
-
-	misc_deregister(&tfa98xx->tfa98xx_reg);
-	misc_deregister(&tfa98xx->tfa98xx_rw);
-	misc_deregister(&tfa98xx->tfa98xx_rpc);
-	misc_deregister(&tfa98xx->tfa98xx_profile);
-	misc_deregister(&tfa98xx->tfa98xx_control);	
-	return;
-}
 
 static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 			     const struct i2c_device_id *id)
@@ -4057,7 +3235,6 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 	int irq_flags;
 	unsigned int reg;
 	int ret;
-	int spk_name;
 
 
 	if (!i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C)) {
@@ -4114,22 +3291,6 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 			GPIOF_DIR_IN, "TFA98XX_INT");
 		if (ret)
 			return ret;
-	}
-
-	tfa98xx->spk_id_gpio_p = of_parse_phandle(np,
-			"nxp,spk-id-pin", 0);
-
-	if (!tfa98xx->spk_id_gpio_p) {
-	} else {
-		spk_name = nxp_spk_id_get(tfa98xx->spk_id_gpio_p);
-		if (spk_name == VENDOR_ID_AAC) {
-			fw_name = TFA98XX_AAC_FW_NAME;
-		}
-
-		if (spk_name == VENDOR_ID_GOER) {
-			fw_name = TFA98XX_GOER_FW_NAME;
-		}
-
 	}
 
 	/* Power up! */
@@ -4221,7 +3382,9 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 	 * have its own instance of this structure, with its own address.
 	 */
 	/* p240: match the Lenovo machine dai_link codec_name (tfa98xx.0034) */
-	dev_set_name(&i2c->dev, "tfa98xx.%04x", i2c->addr);
+	ret = dev_set_name(&i2c->dev, "%s.00%2x", "tfa98xx", i2c->addr);
+	if (ret)
+		dev_err(&i2c->dev, "%s failed to set device name", __func__);
 	dai = devm_kzalloc(&i2c->dev, sizeof(tfa98xx_dai), GFP_KERNEL);
 	if (!dai)
 		return -ENOMEM;
@@ -4278,8 +3441,6 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 	ret = device_create_bin_file(&i2c->dev, &dev_attr_reg);
 	if (ret)
 		dev_info(&i2c->dev, "error creating sysfs files\n");
-	if (0 == tfa98xx_device_count)
-		tfa98xx_init_misc_device(tfa98xx);
 	pr_info("%s Probe completed successfully!\n", __func__);
 
 	INIT_LIST_HEAD(&tfa98xx->list);
@@ -4309,7 +3470,6 @@ static int tfa98xx_i2c_remove(struct i2c_client *i2c)
 #ifdef CONFIG_DEBUG_FS
 	tfa98xx_debug_remove(tfa98xx);
 #endif
-	tfa98xx_remove_misc_device(tfa98xx);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,18,0)
 	snd_soc_unregister_component(&i2c->dev);
@@ -4405,4 +3565,3 @@ module_exit(tfa98xx_i2c_exit);
 
 MODULE_DESCRIPTION("ASoC TFA98XX driver");
 MODULE_LICENSE("GPL");
-

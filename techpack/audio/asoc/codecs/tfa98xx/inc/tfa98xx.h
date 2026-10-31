@@ -20,7 +20,6 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/list.h>
-#include <linux/miscdevice.h>
 
 #include "tfa_device.h"
 #include "tfa_container.h"
@@ -58,20 +57,6 @@ enum tfa98xx_dsp_fw_state {
        TFA98XX_DSP_FW_PENDING,
        TFA98XX_DSP_FW_FAIL,
        TFA98XX_DSP_FW_OK,
-};
-
-enum tfa98xx_misc_device_id {
-	MISC_DEVICE_TFA98XX_REG,
-	MISC_DEVICE_TFA98XX_RW,
-	MISC_DEVICE_TFA98XX_RPC,
-	MISC_DEVICE_TFA98XX_PROFILE,
-	MISC_DEVICE_TFA98XX_IOCTL,
-	MISC_DEVICE_MAX
-};
-
-struct tfa98xx_miscdevice_info {
-	char devicename[255];
-	struct file_operations operations;
 };
 
 enum TFA_DEVICE_TYPE{
@@ -176,13 +161,6 @@ struct tfa98xx {
 	uint16_t cal_data;
 	enum TFA_DEVICE_MUTE tfa_mute_mode;
 
-	struct device_node *spk_id_gpio_p;
-
-	struct miscdevice tfa98xx_reg;
-	struct miscdevice tfa98xx_rw;
-	struct miscdevice tfa98xx_rpc;	
-	struct miscdevice tfa98xx_profile;
-	struct miscdevice tfa98xx_control;
 };
 
 
