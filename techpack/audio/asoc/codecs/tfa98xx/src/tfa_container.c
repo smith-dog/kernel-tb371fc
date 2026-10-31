@@ -671,7 +671,7 @@ enum Tfa98xx_Error tfaContWriteFile(struct tfa_device *tfa,  nxpTfaFileDsc_t *fi
 		/* container subversion[0..1] = version string -> minor int */
 		ver_str[0] = hdr->subversion[0];
 		ver_str[1] = hdr->subversion[1];
-		if (sscanf(ver_str, ""%d"", &hdr_minor) < 1)
+		if (sscanf(ver_str, "%d", &hdr_minor) < 1)
 			hdr_minor = 0;
 		if (hdr_minor < 1)
 			goto skip_api_check;
