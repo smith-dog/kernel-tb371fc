@@ -128,6 +128,7 @@ struct tfa_device {
 	unsigned char spkr_select;
 	unsigned char support_tcoef;/**< legacy tfa9887, will be removed */
 	enum Tfa98xx_DAI daimap; /**< supported audio interface types */
+	int bitwidth; /**< PCM sample width in bits (stock tfa+0x14) */
 	int mohm[3]; /**< speaker calibration values in milli ohms -1 is error */
 	struct tfa_device_ops dev_ops;
 	uint16_t interrupt_enable[3];

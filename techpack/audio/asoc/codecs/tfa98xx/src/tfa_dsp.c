@@ -2731,6 +2731,91 @@ enum Tfa98xx_Error tfaRunStartDSP(struct tfa_device *tfa)
  * start the clocks and wait until the AMP is switching
  *  on return the DSP sub system will be ready for loading
  */
+
+/*
+ * stock parity (W90-F2): TDM bitwidth configuration
+ * stock @0x6b08, called from tfaRunStartup + tfa98xx_hw_params
+ * bitwidth: 32->SLLN=31,SSIZE=23; 24->SLLN=31,SSIZE=23; 16->SLLN=15,SSIZE=15
+ * NBCK=2 (both families)
+ * per-rev BF selection handled by TFA_SET_BF via dev_ops (stock jump table equivalent)
+ */
+enum Tfa98xx_Error tfa_dev_set_tdm_bitwidth(struct tfa_device *tfa, int bitwidth)
+{
+	int slln, ssize, nbck = 2;
+	enum Tfa98xx_Error err;
+
+	switch (bitwidth) {
+	case 32:
+		if (tfa->tfa_family == 2) {
+			slln = 31; ssize = 23;
+		} else {
+			slln = 31; ssize = 23;
+			nbck = 2;
+		}
+		break;
+	case 24:
+		if (tfa->tfa_family == 2) {
+			slln = 31; ssize = 23;
+		} else {
+			slln = 31; ssize = 23;
+			nbck = 2;
+		}
+		break;
+	case 16:
+		slln = 15; ssize = 15;
+		break;
+	default:
+		pr_err("unsupported tdm bitwidth:%d\n", bitwidth);
+		return Tfa98xx_Error_Bad_Parameter;
+	}
+
+	err = TFA_SET_BF(tfa, TDMNBCK, nbck);
+	if (err != Tfa98xx_Error_Ok)
+		goto error_exit;
+
+	err = TFA_SET_BF(tfa, TDMSLLN, slln);
+	if (err != Tfa98xx_Error_Ok)
+		goto error_exit;
+
+	err = TFA_SET_BF(tfa, TDMSSIZE, ssize);
+
+error_exit:
+	return err;
+}
+
+/* stock parity: tfaGetFwApiVersion - dual path (DSP msg / XMEM read) */
+int tfaGetFwApiVersion(struct tfa_device *tfa, int *api_version)
+{
+	if (tfa == NULL)
+		return 2; /* Bad_Parameter */
+
+	if (tfa->bus != 0) { /* external DSP via msg hal */
+		char msg[3] = {0, (char)0x80, (char)0xfe};
+		enum Tfa98xx_Error err;
+		err = tfa98xx_write_dsp(tfa, 3, msg);
+		if (err != Tfa98xx_Error_Ok) {
+			pr_err("%s Error: Unable to get API Version from DSP \\n", __func__);
+			return err;
+		}
+		/* response read via tfa98xx_read_dsp - Not_Supported on this platform */
+		return Tfa98xx_Error_Not_Supported;
+	}
+
+	/* XMEM path: API version at XMEM 0x209 via ops mem_read */
+	{
+		int value = 0;
+		enum Tfa98xx_Error err;
+		err = (tfa->dev_ops.tfa_mem_read)(tfa, 0x209, 1, &value);
+		if (err != Tfa98xx_Error_Ok)
+			return err;
+		api_version[0] = (value >> 24) & 0xff;
+		api_version[1] = (value >> 16) & 0xff;
+		api_version[2] = (value >> 8) & 0xff;
+		api_version[3] = value & 0xff;
+	}
+	return 0;
+}
+
 enum Tfa98xx_Error tfaRunStartup(struct tfa_device *tfa, int profile)
 {
 	enum Tfa98xx_Error err = Tfa98xx_Error_Ok;
@@ -2771,6 +2856,13 @@ enum Tfa98xx_Error tfaRunStartup(struct tfa_device *tfa, int profile)
 
 	/* Factory trimming for the Boost converter */
 	tfa98xx_factory_trimmer(tfa);
+
+	/* stock parity: TDM bitwidth setting (W90-F2) */
+	if (tfa->daimap & Tfa98xx_DAI_TDM) {
+		err = tfa_dev_set_tdm_bitwidth(tfa, tfa->bitwidth);
+		if (err)
+			return 3;
+	}
 
 	/* Go to the initCF state */
 	tfa_dev_set_state(tfa, TFA_STATE_INIT_CF, strstr(tfaContProfileName(tfa->cnt, tfa->dev_idx, profile), ".cal") != NULL);

@@ -2787,6 +2787,7 @@ static int tfa98xx_hw_params(struct snd_pcm_substream *substream,
 
 	/* update to new rate */
 	tfa98xx->rate = rate;
+	tfa98xx->tfa->bitwidth = snd_pcm_format_width(params_format(params));
 
 	return 0;
 }
