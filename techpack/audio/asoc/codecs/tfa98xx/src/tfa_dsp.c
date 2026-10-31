@@ -20,12 +20,6 @@
 #include "../inc/tfa98xx_tfafieldnames.h"
 #include "../inc/tfa_internal.h"
 
-#ifdef __KERNEL__
-	#ifdef pr_fmt
-	#undef pr_fmt
-	#endif
-	#define pr_fmt(fmt) "%s(): " fmt, __func__
-#endif
 /* handle macro for bitfield */
 #define TFA_MK_BF(reg, pos, len) ((reg<<8)|(pos<<4)|(len-1))
 
@@ -775,7 +769,7 @@ enum Tfa98xx_Error tfa98xx_set_mtp(struct tfa_device *tfa, uint16_t value, uint1
 
 	if ( mtp_old == mtp_new) /* no change */ {
 		if (tfa->verbose)
-			pr_debug("No change in MTP. Value not written! \n");
+			pr_info("No change in MTP. Value not written! \n");
 		return Tfa98xx_Error_Ok;
 	}
 
@@ -2467,7 +2461,7 @@ enum Tfa98xx_Error tfa_cf_powerup(struct tfa_device *tfa)
 
 	// wait until everything is stable, in case clock has been off
 	if (tfa->verbose)
-		pr_debug("Waiting for DSP system stable...\n");
+		pr_info("Waiting for DSP system stable...\n");
 	for ( tries=CFSTABLE_TRIES; tries > 0; tries-- ) {
 		err = tfa98xx_dsp_system_stable(tfa, &status);
 		_ASSERT(err == Tfa98xx_Error_Ok);
@@ -2981,13 +2975,7 @@ enum Tfa98xx_Error tfaRunWaitCalibration(struct tfa_device *tfa, int *calibrateD
  * tfa_dev_start will only do the basics: Going from powerdown to operating or a profile switch.
  * for calibrating or akoustic shock handling use the tfa98xxCalibration function.
  */
-/*[nxp34663] CR: support 16bit/24bit/32bit audio data. begin*/
-#ifdef __KERNEL__
-enum tfa_error tfa_dev_start(struct tfa_device *tfa, int next_profile, int vstep, u8 pcm_format)
-#else
 enum tfa_error tfa_dev_start(struct tfa_device *tfa, int next_profile, int vstep)
-#endif
-/*[nxp34663] CR: support 16bit/24bit/32bit audio data. end*/
 {
 	enum Tfa98xx_Error err = Tfa98xx_Error_Ok;
 	int active_profile = -1;
@@ -3011,27 +2999,6 @@ enum tfa_error tfa_dev_start(struct tfa_device *tfa, int next_profile, int vstep
 		if ( err != Tfa98xx_Error_Ok)
 			goto error_exit;
 	}
-
-	/*[nxp34663] CR: support 16bit/24bit/32bit audio data. begin*/
-#ifdef __KERNEL__
-	if ((2 == tfa->tfa_family) && (tfa->daimap & Tfa98xx_DAI_TDM)) {
-		//TFA_SET_BF(tfa, TDMSRCMAP, 2);	/*the TDMSRCMAP should be set in cnt file.*/
-		/* we should remove below settings from cnt file, otherwise will be overwrite by cnt file later.*/
-		if (16 == pcm_format) {
-			TFA_SET_BF(tfa, TDMNBCK, 0);
-			TFA_SET_BF(tfa, TDMSLLN, 15);
-			TFA_SET_BF(tfa, TDMSSIZE, 15);
-		} else if ((24 == pcm_format) || (32 == pcm_format)) {
-			TFA_SET_BF(tfa, TDMNBCK, 2);
-			TFA_SET_BF(tfa, TDMSLLN, 31);
-			TFA_SET_BF(tfa, TDMSSIZE, 31);
-		} else {
-			err = Tfa98xx_Error_Bad_Parameter;
-			goto error_exit;
-		}
-	}
-#endif
-	/*[nxp34663] CR: support 16bit/24bit/32bit audio data. end*/
 
 	if ( tfa->bus != 0 )  { /* non i2c  */
 #ifndef __KERNEL__
@@ -3124,7 +3091,7 @@ enum tfa_error tfa_dev_start(struct tfa_device *tfa, int next_profile, int vstep
 	/* PLMA5539: Gives information about current setting of powerswitch */
 	if (tfa->verbose) {
 		if (!tfa98xx_powerswitch_is_enabled(tfa))
-			pr_debug("Device start without powerswitch enabled!\n");
+			pr_info("Device start without powerswitch enabled!\n");
 	}
 
 error_exit:
@@ -3156,17 +3123,6 @@ enum tfa_error tfa_dev_stop(struct tfa_device *tfa)
 
 	/* disable I2S output on TFA1 devices without TDM */
 	err = tfa98xx_aec_output(tfa, 0);
-
-	/* added by nxp34663 beging. */
-	/* we should ensure the state machine in powerdown mode here. */
-	manstate = TFA_GET_BF(tfa, MANSTATE);
-	while ((manstate >= 4) && (retry < 100)) {
-		pr_debug("%s  waitting state machine goto powerdown.  MANSTATE=%d\n", __func__, manstate);
-		msleep_interruptible(10);
-		manstate = TFA_GET_BF(tfa, MANSTATE);
-		retry++;
-	}
-	/* added by nxp34663 end. */
 error_exit:
 	if (err != Tfa98xx_Error_Ok) {
 		pr_err("TFA98xx Error code is %d\n", err);
@@ -3944,7 +3900,7 @@ int tfa_plop_noise_interrupt(struct tfa_device *tfa, int profile, int vstep)
 		/* Detect for clock is lost! (clock is not stable) */
 		if (no_clk == 1) {
 			/* Clock is lost. Set I2CR to remove POP noise */
-			pr_debug("No clock detected. Resetting the I2CR to avoid pop on 72! \n");
+			pr_info("No clock detected. Resetting the I2CR to avoid pop on 72! \n");
 #ifdef __KERNEL__
 			err = tfa_dev_start(tfa, profile, vstep, pcm_format);
 #else
@@ -3953,7 +3909,7 @@ int tfa_plop_noise_interrupt(struct tfa_device *tfa, int profile, int vstep)
 			if (err != tfa_error_ok) {
 				pr_err("Error loading i2c registers (tfa_dev_start), err=%d\n", err);
 			} else {
-				pr_debug("Setting i2c registers after I2CR succesfull\n");
+				pr_info("Setting i2c registers after I2CR succesfull\n");
 				tfa_dev_set_state(tfa, TFA_STATE_UNMUTE, 0);
 			}
 
@@ -3965,7 +3921,7 @@ int tfa_plop_noise_interrupt(struct tfa_device *tfa, int profile, int vstep)
 			   However: Not tested yet! But also does not harm normal flow!
 			*/
 			if (strstr(tfaContProfileName(tfa->cnt, tfa->dev_idx, profile), ".saam")) {
-				pr_debug("Powering down from a SAAM profile, workaround PLMA4766 used! \n");
+				pr_info("Powering down from a SAAM profile, workaround PLMA4766 used! \n");
 				TFA_SET_BF(tfa, PWDN, 1);
 				TFA_SET_BF(tfa, AMPE, 0);
 				TFA_SET_BF(tfa, SAMMODE, 0);
@@ -3991,9 +3947,9 @@ void tfa_lp_mode_interrupt(struct tfa_device *tfa)
 	if (tfa_irq_get(tfa, irq_stclp0)) {
 		lp0 = TFA_GET_BF(tfa, LP0);
 		if (lp0 > 0) {
-			pr_debug("lowpower mode 0 detected\n");
+			pr_info("lowpower mode 0 detected\n");
 		} else {
-			pr_debug("lowpower mode 0 not detected\n");
+			pr_info("lowpower mode 0 not detected\n");
 		}
 
 		tfa_irq_set_pol(tfa, irq_stclp0, (lp0 == 0));
@@ -4005,9 +3961,9 @@ void tfa_lp_mode_interrupt(struct tfa_device *tfa)
 	if (tfa_irq_get(tfa, tfa9912_irq_stclpr)) {
 		lp1 = TFA_GET_BF(tfa, LP1);
 		if (lp1 > 0) {
-			pr_debug("lowpower mode 1 detected\n");
+			pr_info("lowpower mode 1 detected\n");
 		} else {
-			pr_debug("lowpower mode 1 not detected\n");
+			pr_info("lowpower mode 1 not detected\n");
 		}
 
 		tfa_irq_set_pol(tfa, tfa9912_irq_stclpr, (lp1 == 0));
