@@ -81,7 +81,6 @@ int tfa9894_change_chan_sel(struct tfa_device *tfa, int spks, int dcs)
 		goto out;
 	err = tfa_set_bf(tfa, TFA9894_BF_TDME, 1);
 out:
-	pr_debug("tfa9894: %s spks=%d dcs=%d ret=%d\n", __func__, spks, dcs, err);
 	return err;
 }
 
@@ -92,8 +91,10 @@ int tfa9894_send_chan_sel_to_dsp(struct tfa_device *tfa, const char *name, int s
 	int err, rc, i;
 
 	rc = tfa9894_get_target_chan_sel(sel, tfa->dev_idx, &spks, &dcs);
-	if (rc)
+	if (rc) {
+		pr_err("%s(): %s :No need to send chan_sel, error=%d\n", __func__, __func__, rc);
 		return rc;
+	}
 
 	/* Already on target: nothing to do (stock short-circuits here too). */
 	cur_spks = tfa_get_bf(tfa, TFA9894_BF_TDMSPKS);
@@ -106,8 +107,10 @@ int tfa9894_send_chan_sel_to_dsp(struct tfa_device *tfa, const char *name, int s
 	for (i = 0; i < ARRAY_SIZE(tfa9894_vol_table); i++) {
 		err = tfa_set_bf(tfa, TFA9894_BF_VOL,
 				 (uint16_t)tfa9894_vol_table[i]);
-		if (err < 0)
+		if (err < 0) {
+			pr_err("%s(): %s :No need to send chan_sel, error=%d\n", __func__, __func__, err);
 			return err;
+		}
 		msleep(1);
 	}
 
@@ -140,8 +143,8 @@ int tfa9894_send_chan_sel_to_dsp(struct tfa_device *tfa, const char *name, int s
 
 	cur_spks = tfa_get_bf(tfa, TFA9894_BF_TDMSPKS);
 	cur_dcs = tfa_get_bf(tfa, TFA9894_BF_TDMDCS);
-	pr_debug("tfa9894: %s readback spks=%d dcs=%d vol=%d\n",
-		 __func__, cur_spks, cur_dcs,
-		 tfa_get_bf(tfa, TFA9894_BF_VOL));
+	pr_info("%s(): %s : end flip, SPKS= %d, DCS= %d , VOL= 0x%X\n", __func__,
+		 name, cur_spks, cur_dcs,
+		 (unsigned)tfa_get_bf(tfa, TFA9894_BF_VOL));
 	return 0;
 }
