@@ -1359,7 +1359,7 @@ static int tfa98xx_set_profile(struct snd_kcontrol *kcontrol,
 	/* get the container profile for the requested sample rate */
 	prof_idx = get_profile_id_for_sr(new_profile, tfa98xx->rate);
 	if (prof_idx < 0) {
-		printk(KERN_ERR "tfa98xx: sample rate [%d] not supported for this mixer profile [%d -> %d].\n", new_profile, profile, new_profile);
+		pr_err("tfa98xx: sample rate [%d] not supported for this mixer profile [%d -> %d].\n", tfa98xx->rate, profile, new_profile);
 		return 0;
 	}
 
