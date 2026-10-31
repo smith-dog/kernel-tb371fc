@@ -297,6 +297,7 @@ static enum tfa_error tfa98xx_tfa_start(struct tfa98xx *tfa98xx, int next_profil
 		if (err_cal != tfa_error_ok) {
 			pr_err("Error, setting calibration value in mtp, err=%d\n", err_cal);
 		} else {
+			pr_info("Calibration value (%d) set in mtp\n", tfa98xx->cal_data);
 			tfa98xx->set_mtp_cal = false;
 		}
 	}
@@ -1377,6 +1378,7 @@ static int tfa98xx_set_profile(struct snd_kcontrol *kcontrol,
 			mutex_lock(&tfa98xx->dsp_lock);
 			tfa98xx_dsp_system_stable(tfa98xx->tfa, &ready);
 			if (ready && (tfa_dev_get_state(tfa98xx->tfa) == TFA_STATE_OPERATING)) {
+				pr_info("Force to start at exiting from standby: [%d -> %d]\n", profile, new_profile);
 				/* Also re-enables the interrupts */
 				err = tfa98xx_tfa_start(tfa98xx, prof_idx, tfa98xx->vstep);
 				if (err) {
@@ -1813,6 +1815,8 @@ static int tfa98xx_append_i2c_address(struct device *dev,
 	char buf[50];
 	int i;
 	int addr = i2c->addr;
+
+	printk("I2C bus id is (%d)\n", i2c->adapter->nr);
 	if (dai_drv && num_dai > 0)
 		for(i = 0; i < num_dai; i++) {
 			memset(buf, 0x00, sizeof(buf));
@@ -2472,8 +2476,14 @@ static void tfa98xx_dsp_init(struct tfa98xx *tfa98xx)
 {
 	int ret;
 	bool failed = false;
+
 	bool reschedule = false;
 	bool sync= false;
+
+	if (no_start != 0) {
+		pr_err("User set 0x%x to skip DSP power-on\n", no_start);
+		return;
+	}
 
 	if (tfa98xx->dsp_fw_state != TFA98XX_DSP_FW_OK) {
 		return;
@@ -3301,6 +3311,7 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 			return ret;
 	}
 
+	pr_info("addr=0x%x\n", i2c->addr);
 	/* Power up! */
 	tfa98xx_ext_reset(tfa98xx);
 
@@ -3369,6 +3380,7 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 			tfa98xx->flags |= TFA98XX_FLAG_TDM_DEVICE;
 			break;
 		default:
+			pr_info("Unsupported device revision (0x%x)\n", reg & 0xff);
 			tfa98xx->flags |= TFA98XX_FLAG_MULTI_MIC_INPUTS;
 			tfa98xx->flags |= TFA98XX_FLAG_TDM_DEVICE;
 			tfa98xx->flags |= TFA98XX_FLAG_SKIP_INTERRUPTS;

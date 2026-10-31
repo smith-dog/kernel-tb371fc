@@ -3045,8 +3045,10 @@ enum tfa_error tfa_dev_start(struct tfa_device *tfa, int next_profile, int vstep
 	 * else we should be in operating state
 	 */
 	if(strstr(tfaContProfileName(tfa->cnt, tfa->dev_idx, next_profile), ".standby") != NULL) {
+		pr_info("Skip powering on device, in standby profile!\n");
 		tfa_dev_set_swprof(tfa, (unsigned short)next_profile);
 		tfa_dev_set_swvstep(tfa, (unsigned short)tfa->vstep);
+		pr_info("Power down device, by force, in standby profile!\n");
 		goto error_exit;
 	}
 
@@ -3117,6 +3119,10 @@ error_exit:
 int tfa_reset(struct tfa_device *tfa)
 {
 	enum Tfa98xx_Error err = Tfa98xx_Error_Ok;
+	int manstate = TFA_GET_BF(tfa, MANSTATE);
+
+	if (manstate != 0) /* POWERDOWN */
+		pr_info("WARNING: Device reset should be performed in POWERDOWN state\n");
 
 	err = -TFA_SET_BF_VOLATILE(tfa, I2CR, 1);
 	if(err) return err;

@@ -662,6 +662,34 @@ enum Tfa98xx_Error tfaContWriteFile(struct tfa_device *tfa,  nxpTfaFileDsc_t *fi
 		tfaContShowHeader(hdr);
 	}
 
+	{
+		/* stock parity: FW API version check */
+		int fw_major = 0, fw_minor = 0, fw_patch = 0, fw_build = 0;
+		int hdr_major = 0, hdr_minor = 0, hdr_patch = 0;
+		char ver_buffer[3] = {0};
+		char *msg = kmem_cache_alloc(tfa->cachep, GFP_KERNEL);
+		if (msg == NULL)
+			return Tfa98xx_Error_Ok; /* cannot check without buffer */
+		msg[0] = 0; msg[1] = 0; msg[2] = 0xfe; /* FW_PAR_ID_GET_API_VERSION */
+		err = dsp_msg(tfa, 3, msg);
+		if (err == Tfa98xx_Error_Ok)
+			err = dsp_msg_read(tfa, sizeof(ver_buffer), ver_buffer);
+		if (err != Tfa98xx_Error_Ok) {
+			kmem_cache_free(tfa->cachep, msg);
+			return err;
+		}
+		kmem_cache_free(tfa->cachep, msg);
+		fw_build = ver_buffer[0]; fw_major = ver_buffer[1]; fw_minor = ver_buffer[2];
+		hdr_major = hdr->version[0]; hdr_minor = hdr->version[1]; hdr_patch = hdr->version[2];
+		if ((hdr_major != fw_major) || (hdr_minor != fw_minor) || (hdr_patch != fw_patch)) {
+		pr_err("tfa98xx: ERROR %s:%d: Error: tfaContWriteFile: Expected FW API version = %d.%d.%d.%d, Msg File version: %d.%d.%d.%d \n"
+		, __func__, __LINE__,
+			fw_major, fw_minor, fw_patch, fw_build,
+			hdr_major, hdr_minor, hdr_patch, 0);
+			return Tfa98xx_Error_Bad_Parameter;
+		}
+	}
+
 	type = (nxpTfaHeaderType_t) hdr->id;
 
 	switch (type) {
@@ -1664,6 +1692,10 @@ enum Tfa98xx_Error tfaContWriteProfile(struct tfa_device *tfa, int prof_idx, int
 	if (tfa->verbose)
 		pr_debug("---------- new settings profile: %s (%d) ---------- \n", 
 				tfaContGetString(tfa->cnt, &prof->name), prof_idx);
+	if (strstr(tfaContGetString(tfa->cnt, &prof->name), ".standby") != NULL) {
+		pr_info("Keep power down without writing files, in standby profile!\n");
+		return Tfa98xx_Error_Ok;
+	}
 
 	/* set new settings */
 	for(i=0;i<prof->length;i++) {
