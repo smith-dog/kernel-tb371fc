@@ -151,20 +151,7 @@ static const struct tfa98xx_rate rate_to_fssel[] = {
 static int tfa9894_get_chan_sel_ctl(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
-	struct tfa98xx *tfa98xx;
-	int count = 0;
-	int rev_ok = 0;
-
 	mutex_lock(&tfa98xx_mutex);
-	list_for_each_entry(tfa98xx, &tfa98xx_device_list, list) {
-		count++;
-		if ((tfa98xx->tfa->tfa_family == 2) &&
-			((tfa98xx->tfa->rev & 0xff) == 0x94))
-			rev_ok++;
-	}
-	pr_err("%s: 0x%x flag is 0x%x, selector=%d\n",
-		__func__, (unsigned int)count, rev_ok,
-		(int)ucontrol->value.integer.value[0]);
 	ucontrol->value.integer.value[0] = tfa9894_get_store_chan_sel();
 	mutex_unlock(&tfa98xx_mutex);
 
@@ -231,8 +218,8 @@ static int tfa9894_set_chan_sel_ctl(struct snd_kcontrol *kcontrol,
 	 * after a successful send would lose the angle in that case. */
 	pr_info("%s:set selector from 0x%04x to 0x%04x\n", __func__,
 		(unsigned)tfa9894_get_store_chan_sel(), (unsigned)value);
-	pr_info("%s:set 0x%x%s chan_sel %s\n", __func__, (unsigned)value,
-		"%s", "applied");
+	pr_info("%s:set 0x%x's chan_sel %s\n", __func__, (unsigned)value,
+		change == 1 ? "sucess" : "fail");
 	tfa9894_set_store_chan_sel((int)value);
 
 	list_for_each_entry(tfa98xx, &tfa98xx_device_list, list) {

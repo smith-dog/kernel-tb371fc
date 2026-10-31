@@ -107,10 +107,8 @@ int tfa9894_send_chan_sel_to_dsp(struct tfa_device *tfa, const char *name, int s
 	for (i = 0; i < ARRAY_SIZE(tfa9894_vol_table); i++) {
 		err = tfa_set_bf(tfa, TFA9894_BF_VOL,
 				 (uint16_t)tfa9894_vol_table[i]);
-		if (err < 0) {
-			pr_err("%s(): %s :No need to send chan_sel, error=%d\n", __func__, __func__, err);
+		if (err < 0)
 			return err;
-		}
 		msleep(1);
 	}
 
