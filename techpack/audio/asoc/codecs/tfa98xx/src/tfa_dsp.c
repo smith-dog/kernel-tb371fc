@@ -3089,7 +3089,6 @@ error_exit:
 enum tfa_error tfa_dev_stop(struct tfa_device *tfa)
 {
 	enum Tfa98xx_Error err = Tfa98xx_Error_Ok;
-	int manstate = 0, retry = 0;
 
 	/* mute */
 	tfaRunMute(tfa);

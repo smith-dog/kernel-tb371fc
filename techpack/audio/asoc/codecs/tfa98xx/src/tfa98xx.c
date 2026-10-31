@@ -204,17 +204,6 @@ const struct snd_kcontrol_new nxp_spk_id_controls[] ={
 	SOC_ENUM_EXT("SPK ID", nxp_vendor_id, nxp_vendor_id_get, NULL),
 };
 
-static int tfa9894_info_chan_sel_ctl(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_info *uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
-	uinfo->count = 1;
-	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 3;
-
-	return 0;
-}
-
 static int tfa9894_get_chan_sel_ctl(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
@@ -1949,7 +1938,6 @@ static int tfa98xx_append_i2c_address(struct device *dev,
 {
 	char buf[50];
 	int i;
-	int i2cbus = i2c->adapter->nr;
 	int addr = i2c->addr;
 	if (dai_drv && num_dai > 0)
 		for(i = 0; i < num_dai; i++) {
@@ -3103,7 +3091,6 @@ static int tfa98xx_probe(struct snd_soc_codec *codec)
 	struct tfa98xx *tfa98xx = snd_soc_codec_get_drvdata(codec);
 	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
 #endif
-	int ret;
 
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,18,0)
