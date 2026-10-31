@@ -218,8 +218,6 @@ static int tfa9894_set_chan_sel_ctl(struct snd_kcontrol *kcontrol,
 	 * after a successful send would lose the angle in that case. */
 	pr_info("%s:set selector from 0x%04x to 0x%04x\n", __func__,
 		(unsigned)tfa9894_get_store_chan_sel(), (unsigned)value);
-	pr_info("%s:set 0x%x's chan_sel %s\n", __func__, (unsigned)value,
-		change == 1 ? "sucess" : "fail");
 	tfa9894_set_store_chan_sel((int)value);
 
 	list_for_each_entry(tfa98xx, &tfa98xx_device_list, list) {
@@ -231,9 +229,14 @@ static int tfa9894_set_chan_sel_ctl(struct snd_kcontrol *kcontrol,
 			mutex_unlock(&tfa98xx->dsp_lock);
 			continue;
 		}
-		if (tfa9894_send_chan_sel_to_dsp(tfa98xx->tfa,
-					  tfa98xx->i2c->name, (int)value) == 0)
-			change = 1;
+		{
+			int ret = tfa9894_send_chan_sel_to_dsp(tfa98xx->tfa,
+					  tfa98xx->i2c->name, (int)value);
+			if (ret == 0)
+				change = 1;
+			pr_info("%s:set 0x%x's chan_sel %s\n", __func__, (unsigned)value,
+				ret == 0 ? "sucess" : "fail");
+		}
 		mutex_unlock(&tfa98xx->dsp_lock);
 	}
 
@@ -1356,6 +1359,7 @@ static int tfa98xx_set_profile(struct snd_kcontrol *kcontrol,
 	/* get the container profile for the requested sample rate */
 	prof_idx = get_profile_id_for_sr(new_profile, tfa98xx->rate);
 	if (prof_idx < 0) {
+		printk(KERN_ERR "tfa98xx: sample rate [%d] not supported for this mixer profile [%d -> %d].\n", new_profile, profile, new_profile);
 		return 0;
 	}
 
