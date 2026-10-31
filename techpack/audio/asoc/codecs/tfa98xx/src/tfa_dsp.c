@@ -2783,6 +2783,48 @@ error_exit:
 	return err;
 }
 
+/* stock parity (W90-F2): tfa_is_94_N2_device - 9894 N2 revision check
+ * stock @0x4ec8: rev = tfa->rev & 0xff; subver = tfa->rev >> 8;
+ * return (rev == 0x94 && subver > 0x1a);
+ */
+int tfa_is_94_N2_device(struct tfa_device *tfa)
+{
+	int rev = tfa->rev & 0xff;
+	int subver = tfa->rev >> 8;
+
+	return (rev == 0x94 && subver > 0x1a);
+}
+
+/* stock parity (W90-F2): tfa2_manual_mtp_cpy - MTP copy with flag-based order
+ * stock @0x18b0: if ext_dsp return; wait mtp busy; reg_read(reg,&val);
+ * if flag: write(reg=167,val) + write(reg=168,readback); else: write(167,readback) + write(168,val)
+ */
+void tfa2_manual_mtp_cpy(struct tfa_device *tfa, int reg, int val, int flag)
+{
+	int readback = 0;
+	enum Tfa98xx_Error err;
+
+	if (tfa->ext_dsp)
+		return;
+
+	/* wait for MTP busy flag clear */
+	if ((tfa->dev_ops.get_mtpb)(tfa) != 0)
+		return;
+
+	/* read current MTP register value */
+	err = (tfa->dev_ops.tfa_reg_read)(tfa, reg, (unsigned short *)&readback);
+	if (err != Tfa98xx_Error_Ok)
+		return;
+
+	if (flag) {
+		(tfa->dev_ops.tfa_reg_write)(tfa, 167, val);
+		(tfa->dev_ops.tfa_reg_write)(tfa, 168, readback);
+	} else {
+		(tfa->dev_ops.tfa_reg_write)(tfa, 167, readback);
+		(tfa->dev_ops.tfa_reg_write)(tfa, 168, val);
+	}
+}
+
 /* stock parity: tfaGetFwApiVersion - dual path (DSP msg / XMEM read) */
 int tfaGetFwApiVersion(struct tfa_device *tfa, int *api_version)
 {
