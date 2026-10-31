@@ -2794,7 +2794,7 @@ int tfaGetFwApiVersion(struct tfa_device *tfa, int *api_version)
 		enum Tfa98xx_Error err;
 		err = tfa98xx_write_dsp(tfa, 3, msg);
 		if (err != Tfa98xx_Error_Ok) {
-			pr_err("%s Error: Unable to get API Version from DSP \\n", __func__);
+			pr_debug("%s Error: Unable to get API Version from DSP \n", __func__);
 			return err;
 		}
 		/* response read via tfa98xx_read_dsp - Not_Supported on this platform */
