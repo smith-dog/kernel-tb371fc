@@ -663,31 +663,53 @@ enum Tfa98xx_Error tfaContWriteFile(struct tfa_device *tfa,  nxpTfaFileDsc_t *fi
 	}
 
 	{
-		/* stock parity: FW API version check */
-		int fw_major = 0, fw_minor = 0, fw_patch = 0, fw_build = 0;
-		int hdr_major = 0, hdr_minor = 0, hdr_patch = 0;
-		char ver_buffer[3] = {0};
-		char *msg = kmem_cache_alloc(tfa->cachep, GFP_KERNEL);
-		if (msg == NULL)
-			return Tfa98xx_Error_Ok; /* cannot check without buffer */
-		msg[0] = 0; msg[1] = 0; msg[2] = 0xfe; /* FW_PAR_ID_GET_API_VERSION */
-		err = dsp_msg(tfa, 3, msg);
-		if (err == Tfa98xx_Error_Ok)
-			err = dsp_msg_read(tfa, sizeof(ver_buffer), ver_buffer);
-		if (err != Tfa98xx_Error_Ok) {
-			kmem_cache_free(tfa->cachep, msg);
-			return err;
+		/* stock parity: FW API version check (tfaGetFwApiVersion path) */
+		int api_version[4] = {0};
+		char ver_str[3] = {0};
+		int hdr_minor = 0;
+		int i;
+		/* container subversion[0..1] = version string -> minor int */
+		ver_str[0] = hdr->subversion[0];
+		ver_str[1] = hdr->subversion[1];
+		if (sscanf(ver_str, ""%d"", &hdr_minor) < 1)
+			hdr_minor = 0;
+		if (hdr_minor < 1)
+			goto skip_api_check;
+		/* APIV marker at hdr+20..23 */
+		if (hdr->customer[0] != 65 /* A */ || hdr->customer[1] != 80 /* P */ ||
+			hdr->customer[2] != 73 /* I */ || hdr->customer[3] != 86 /* V */)
+			goto skip_api_check;
+		/* get FW API version via mem_read XMEM 0x209 (non-ext-dsp path) */
+		{
+			int fw_api = 0;
+			enum Tfa98xx_Error err2;
+			err2 = (tfa->dev_ops.tfa_mem_read)(tfa, 0x209, 1, &fw_api);
+			if (err2 != Tfa98xx_Error_Ok)
+				goto skip_api_check;
+			api_version[0] = (fw_api >> 24) & 0xff;
+			api_version[1] = (fw_api >> 16) & 0xff;
+			api_version[2] = (fw_api >> 8) & 0xff;
+			api_version[3] = fw_api & 0xff;
 		}
-		kmem_cache_free(tfa->cachep, msg);
-		fw_build = ver_buffer[0]; fw_major = ver_buffer[1]; fw_minor = ver_buffer[2];
-		hdr_major = hdr->version[0]; hdr_minor = hdr->version[1]; hdr_patch = hdr->version[2];
-		if ((hdr_major != fw_major) || (hdr_minor != fw_minor) || (hdr_patch != fw_patch)) {
-		pr_err("tfa98xx: ERROR %s:%d: Error: tfaContWriteFile: Expected FW API version = %d.%d.%d.%d, Msg File version: %d.%d.%d.%d \n"
-		, __func__, __LINE__,
-			fw_major, fw_minor, fw_patch, fw_build,
-			hdr_major, hdr_minor, hdr_patch, 0);
-			return Tfa98xx_Error_Bad_Parameter;
+		/* 4-seg compare vs container bytes hdr+24..27 */
+		{
+			unsigned char *cnt_ver = (unsigned char *)hdr + 24;
+			int mismatch = 0;
+			for (i = 0; i < 4; i++) {
+				if (api_version[i] != cnt_ver[i]) {
+					mismatch = 1;
+					break;
+				}
+			}
+			if (mismatch) {
+				pr_err("tfa98xx: ERROR %s:%d: Error: tfaContWriteFile: Expected FW API version = %d.%d.%d.%d, Msg File version: %d.%d.%d.%d \n",
+					__func__, __LINE__,
+					api_version[0], api_version[1], api_version[2], api_version[3],
+					cnt_ver[0], cnt_ver[1], cnt_ver[2], cnt_ver[3]);
+				return Tfa98xx_Error_Bad_Parameter;
+			}
 		}
+		skip_api_check:;
 	}
 
 	type = (nxpTfaHeaderType_t) hdr->id;
