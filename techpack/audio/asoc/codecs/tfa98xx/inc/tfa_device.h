@@ -59,10 +59,10 @@ enum Tfa98xx_DAI {
 struct tfa_device_ops {
 	enum Tfa98xx_Error(*dsp_msg)(struct tfa_device *tfa, int length, const char *buf);
 	enum Tfa98xx_Error(*dsp_msg_read)(struct tfa_device *tfa, int length, unsigned char *bytes);
-	enum Tfa98xx_Error(*reg_read)(struct tfa_device *tfa, unsigned char subaddress, unsigned short *value);
-	enum Tfa98xx_Error(*reg_write)(struct tfa_device *tfa, unsigned char subaddress, unsigned short value);
-	enum Tfa98xx_Error(*mem_read)(struct tfa_device *tfa, unsigned int start_offset, int num_words, int *pValues);
-	enum Tfa98xx_Error(*mem_write)(struct tfa_device *tfa, unsigned short address, int value, int memtype);
+	enum Tfa98xx_Error(*tfa_reg_read)(struct tfa_device *tfa, unsigned char subaddress, unsigned short *value);
+	enum Tfa98xx_Error(*tfa_reg_write)(struct tfa_device *tfa, unsigned char subaddress, unsigned short value);
+	enum Tfa98xx_Error(*tfa_mem_read)(struct tfa_device *tfa, unsigned int start_offset, int num_words, int *pValues);
+	enum Tfa98xx_Error(*tfa_mem_write)(struct tfa_device *tfa, unsigned short address, int value, int memtype);
 
 	enum Tfa98xx_Error (*tfa_init)(struct tfa_device *tfa); /**< init typically for loading optimal settings */
 	enum Tfa98xx_Error (*dsp_reset)(struct tfa_device *tfa, int state); /**< reset the coolflux dsp */

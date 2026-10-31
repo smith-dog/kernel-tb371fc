@@ -508,7 +508,7 @@ static enum Tfa98xx_Error tfaContWriteVstepMax2_One(struct tfa_device *tfa, stru
 	}
 
 	if (use_partial_coeff) {
-		err = dsp_partial_coefficients(tfa, old_msg->ParameterData, new_msg->ParameterData);
+		err = tfa_dsp_partial_coefficients(tfa, old_msg->ParameterData, new_msg->ParameterData);
 	} else if (len) {
 		uint8_t *buffer;
 
@@ -911,7 +911,7 @@ enum Tfa98xx_Error tfaRunReadBitfield(struct tfa_device *tfa,  nxpTfaBitfield_t 
 
 	bfUni.field = bf->field;
 
-	error = reg_read(tfa, (unsigned char)(bfUni.Enum.address), &regvalue);
+	error = tfa_reg_read(tfa, (unsigned char)(bfUni.Enum.address), &regvalue);
 	if (error) return error;
 
 	msk = ((1<<(bfUni.Enum.len+1))-1)<<bfUni.Enum.pos;
@@ -934,7 +934,7 @@ static enum Tfa98xx_Error tfaRunWriteDspMem(struct tfa_device *tfa, nxpTfaDspMem
 		if (tfa->verbose)
 			pr_debug("dsp mem (%d): 0x%02x=0x%04x\n", cfmem->type, cfmem->address, cfmem->words[i]);
 
-		error = mem_write(tfa, cfmem->address++, cfmem->words[i], cfmem->type);
+		error = tfa_mem_write(tfa, cfmem->address++, cfmem->words[i], cfmem->type);
 		if (error) return error;
 	}
 
@@ -1041,14 +1041,14 @@ static enum Tfa98xx_Error tfaRunWriteRegister(struct tfa_device *tfa, nxpTfaRegp
 	if (tfa->verbose)
 		pr_debug("register: 0x%02x=0x%04x (msk=0x%04x)\n", reg->address, reg->value, reg->mask);
 
-	error = reg_read(tfa, reg->address, &value);
+	error = tfa_reg_read(tfa, reg->address, &value);
 	if (error) return error;
 
 	value &= ~reg->mask;
 	newvalue = reg->value & reg->mask;
 
 	value |= newvalue;
-	error = reg_write(tfa,  reg->address, value);
+	error = tfa_reg_write(tfa,  reg->address, value);
 
 	return error;
 
@@ -1642,7 +1642,7 @@ enum Tfa98xx_Error tfaContWriteProfile(struct tfa_device *tfa, int prof_idx, int
 				tfaContGetString(tfa->cnt, &previous_prof->name), tfa_dev_get_swprof(tfa));
 	}
 
-	err = show_current_state(tfa);
+	err = tfa_show_current_state(tfa);
 
 	/* Loop profile length */
 	for(i=0;i<previous_prof->length;i++) {
@@ -1708,7 +1708,7 @@ enum Tfa98xx_Error tfaContWriteProfile(struct tfa_device *tfa, int prof_idx, int
 		err = tfa_cf_powerup(tfa);
 		if (err) return err;
 
-		err = show_current_state(tfa);
+		err = tfa_show_current_state(tfa);
 
 		if (tfa->tfa_family == 2) {
 			/* Reset SBSL to 0 (workaround of enbl_powerswitch=0) */
@@ -2167,14 +2167,14 @@ static void get_all_features_from_cnt(struct tfa_device *tfa, int *hw_feature_re
 }
 
 /* wrapper function */
-void get_hw_features_from_cnt(struct tfa_device *tfa, int *hw_feature_register)
+void tfa_get_hw_features_from_cnt(struct tfa_device *tfa, int *hw_feature_register)
 {
         int sw_feature_register[2];
         get_all_features_from_cnt(tfa, hw_feature_register, sw_feature_register);
 }
 
 /* wrapper function */
-void get_sw_features_from_cnt(struct tfa_device *tfa, int sw_feature_register[2])
+void tfa_get_sw_features_from_cnt(struct tfa_device *tfa, int sw_feature_register[2])
 {
         int hw_feature_register;
         get_all_features_from_cnt(tfa, &hw_feature_register, sw_feature_register);

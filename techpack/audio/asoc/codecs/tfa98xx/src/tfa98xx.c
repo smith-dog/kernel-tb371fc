@@ -223,7 +223,7 @@ static int tfa9894_set_chan_sel_ctl(struct snd_kcontrol *kcontrol,
 			mutex_unlock(&tfa98xx->dsp_lock);
 			continue;
 		}
-		if (tfa9894_send_chan_sel(tfa98xx->tfa,
+		if (tfa9894_send_chan_sel_to_dsp(tfa98xx->tfa,
 					  tfa98xx->i2c->name, (int)value) == 0)
 			change = 1;
 		mutex_unlock(&tfa98xx->dsp_lock);
@@ -844,11 +844,11 @@ static ssize_t tfa98xx_dbgfs_rpc_read(struct file *file,
 	if (tfa98xx->tfa->is_probus_device) {
 		error = send_tfa_cal_apr(buffer, count, true);
 	} else {
-		error = dsp_msg_read(tfa98xx->tfa, count, buffer);
+		error = tfa_dsp_msg_read(tfa98xx->tfa, count, buffer);
 	}
 	mutex_unlock(&tfa98xx->dsp_lock);
 	if (error != Tfa98xx_Error_Ok) {
-		pr_debug("[0x%x] dsp_msg_read error: %d\n", tfa98xx->i2c->addr, error);
+		pr_debug("[0x%x] tfa_dsp_msg_read error: %d\n", tfa98xx->i2c->addr, error);
 		kfree(buffer);
 		return -EFAULT;
 	}

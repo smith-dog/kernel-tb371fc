@@ -51,6 +51,6 @@ int tfa9894_change_chan_sel(struct tfa_device *tfa, int spks, int dcs);
  * volume fade in).  @name is only used for diagnostics.  Returns 0 when the
  * amplifier already sits on the target slots.
  */
-int tfa9894_send_chan_sel(struct tfa_device *tfa, const char *name, int sel);
+int tfa9894_send_chan_sel_to_dsp(struct tfa_device *tfa, const char *name, int sel);
 
 #endif /* __TFA9894_H__ */

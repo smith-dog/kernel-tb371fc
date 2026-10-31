@@ -85,7 +85,7 @@ out:
 	return err;
 }
 
-int tfa9894_send_chan_sel(struct tfa_device *tfa, const char *name, int sel)
+int tfa9894_send_chan_sel_to_dsp(struct tfa_device *tfa, const char *name, int sel)
 {
 	int spks, dcs;
 	int cur_spks, cur_dcs;
