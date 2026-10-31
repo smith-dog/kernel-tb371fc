@@ -92,14 +92,11 @@ static int __init p249_preload_container(void)
 
 	rc = request_firmware(&fw, fw_name, NULL);
 	if (rc == 0 && fw) {
-		pr_info("p249: preloaded %s (%zu bytes) into fw cache\n",
-			fw_name, fw->size);
 		release_firmware(fw);
 		/* request_firmware caches until release; re-request later
 		 * hits the cache. To persist across the early probe we rely
 		 * on the cache holding the entry until the consumer loads. */
 	} else {
-		pr_info("p249: preload rc=%d (vendor fs not mounted yet)\n", rc);
 	}
 	return 0;
 }
@@ -250,8 +247,6 @@ static int tfa9894_set_chan_sel_ctl(struct snd_kcontrol *kcontrol,
 	}
 
 	if ((count != 4) || (rev_ok != 4)) {
-		pr_debug("p269: chan selector unsupported, count=%d rev_ok=%d\n",
-			count, rev_ok);
 		mutex_unlock(&tfa98xx_mutex);
 		return -ENODEV;
 	}
@@ -267,19 +262,16 @@ static int tfa9894_set_chan_sel_ctl(struct snd_kcontrol *kcontrol,
 					   first->profile) : NULL;
 
 		if (pname != NULL && strstr(pname, "nonRotation") != NULL) {
-			pr_debug("p269: control disabled during a call (%s)\n", pname);
 			mutex_unlock(&tfa98xx_mutex);
 			return 0;
 		}
 	}
 
 	if (value < 0 || value > 3) {
-		pr_debug("p269: invalid chan selector %ld, fallback to 0\n", value);
 		value = 0;
 	}
 
 	if (value == tfa9894_get_store_chan_sel()) {
-		pr_debug("p269: the angle is same\n");
 		mutex_unlock(&tfa98xx_mutex);
 		return 0;
 	}
@@ -351,13 +343,7 @@ static enum tfa_error tfa98xx_tfa_start(struct tfa98xx *tfa98xx, int next_profil
 		start_time = ktime_get_boottime();
 	}
 
-	/*[nxp34663] CR: support 16bit/24bit/32bit audio data. begin*/
-#ifdef __KERNEL__
 	err = tfa_dev_start(tfa98xx->tfa, next_profile, vstep);
-#else
-	err = tfa_dev_start(tfa98xx->tfa, next_profile, vstep);
-#endif
-	/*[nxp34663] CR: support 16bit/24bit/32bit audio data. end*/
 	pr_debug("%s  after performed tfa_dev_start return (%d)\n", __func__, err);
 
 	if (trace_level & 8) {
@@ -2746,8 +2732,6 @@ static void tfa98xx_dsp_init(struct tfa98xx *tfa98xx)
 	mutex_lock(&tfa98xx->dsp_lock);
 
 	tfa98xx->dsp_init = TFA98XX_DSP_INIT_PENDING;
-
-	pr_debug("[NXP] %s  init_count=%d\n", __func__, tfa98xx->init_count);
 	if (tfa98xx->init_count < TF98XX_MAX_DSP_START_TRY_COUNT) {
 		/* directly try to start DSP */
 		ret = tfa98xx_tfa_start(tfa98xx, tfa98xx->profile, tfa98xx->vstep);
@@ -2860,9 +2844,7 @@ static void tfa98xx_interrupt(struct work_struct *work)
 		int start_triggered;
 
 		mutex_lock(&tfa98xx->dsp_lock);
-		/*[nxp34663] CR: support 16bit/24bit/32bit audio data. begin*/
-		start_triggered = tfa_plop_noise_interrupt(tfa98xx->tfa, tfa98xx->profile, tfa98xx->vstep, tfa98xx->pcm_format);
-		/*[nxp34663] CR: support 16bit/24bit/32bit audio data. end*/
+		start_triggered = tfa_plop_noise_interrupt(tfa98xx->tfa, tfa98xx->profile, tfa98xx->vstep);
 		/* Only enable when the return value is 1, otherwise the interrupt is triggered twice */
 		if(start_triggered)
 			tfa98xx_interrupt_enable(tfa98xx, true);
@@ -3047,10 +3029,6 @@ static int tfa98xx_hw_params(struct snd_pcm_substream *substream,
 	/* update to new rate */
 	tfa98xx->rate = rate;
 
-	/*[nxp34663] CR: support 16bit/24bit/32bit audio data. begin*/
-	tfa98xx->pcm_format = snd_pcm_format_width(params_format(params));
-	/*[nxp34663] CR: support 16bit/24bit/32bit audio data. end*/
-
 	return 0;
 }
 
@@ -3190,7 +3168,6 @@ static int tfa98xx_mute(struct snd_soc_dai *dai, int mute, int stream)
 			                   &tfa98xx->init_work, 0);
 #else
 		/* Start DSP with sync mode.*/
-		pr_debug("[NXP] %s dsp_init=%d\n", __func__, tfa98xx->dsp_init);
 		if (tfa98xx->dsp_init != TFA98XX_DSP_INIT_PENDING)
 			tfa98xx_dsp_init(tfa98xx);
 #endif
@@ -4425,7 +4402,6 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 			tfa98xx->flags |= TFA98XX_FLAG_TDM_DEVICE;
 			break;
 		default:
-			pr_info("p236: unknown rev 0x%x, treating as TFA9894\n", reg & 0xff);
 			tfa98xx->flags |= TFA98XX_FLAG_MULTI_MIC_INPUTS;
 			tfa98xx->flags |= TFA98XX_FLAG_TDM_DEVICE;
 			tfa98xx->flags |= TFA98XX_FLAG_SKIP_INTERRUPTS;
@@ -4459,13 +4435,11 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 				0,
 				dai,
 				ARRAY_SIZE(tfa98xx_dai));
-	pr_info("p245: dai[0].name=%s\n", dai[0].name);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,18,0)
 	ret = devm_snd_soc_register_component(&i2c->dev,
 				&soc_codec_dev_tfa98xx, dai,
 				ARRAY_SIZE(tfa98xx_dai));
-	pr_info("p245: register_component rc=%d\n", ret);
 #else
 	ret = snd_soc_register_codec(&i2c->dev,
 				&soc_codec_dev_tfa98xx, dai,

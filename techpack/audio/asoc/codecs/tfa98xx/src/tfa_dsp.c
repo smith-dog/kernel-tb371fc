@@ -3032,7 +3032,6 @@ enum tfa_error tfa_dev_start(struct tfa_device *tfa, int next_profile, int vstep
 		}
 		/* Make sure internal oscillator is running for DSP devices (non-dsp and max1 this is no-op) */
 		tfa98xx_set_osc_powerdown(tfa, 0);
-		pr_debug("[NXP] %s after osc_powerdown\n", __func__);
 
 		/* Go to the Operating state */
 #if 0
@@ -3040,7 +3039,6 @@ enum tfa_error tfa_dev_start(struct tfa_device *tfa, int next_profile, int vstep
 #else
 		tfa_dev_set_state(tfa, TFA_STATE_OPERATING, 0);
 #endif
-		pr_debug("[NXP] %s after implemented tfa_dev_set_state()\n", __func__);
 	}
 
 	active_profile = tfa_dev_get_swprof(tfa);
@@ -3053,7 +3051,6 @@ enum tfa_error tfa_dev_start(struct tfa_device *tfa, int next_profile, int vstep
 			goto error_exit;
 		}
 	}
-	pr_debug("[NXP] %s after implemented tfaContWriteProfile()\n", __func__);
 
 	/* If the profile contains the .standby suffix go to powerdown
 	 * else we should be in operating state
@@ -3095,7 +3092,6 @@ enum tfa_error tfa_dev_start(struct tfa_device *tfa, int next_profile, int vstep
 	}
 
 error_exit:
-	pr_debug("[NXP] %s end...\n", __func__);
 	show_current_state(tfa);
 	if (err != Tfa98xx_Error_Ok) {
 		pr_err("TFA98xx Error code is %d\n", err);
@@ -3881,11 +3877,7 @@ enum Tfa98xx_Error tfa_status(struct tfa_device *tfa)
 	return Tfa98xx_Error_Ok;
 }
 
-#ifdef __KERNEL__
-int tfa_plop_noise_interrupt(struct tfa_device *tfa, int profile, int vstep, u8 pcm_format)
-#else
 int tfa_plop_noise_interrupt(struct tfa_device *tfa, int profile, int vstep)
-#endif
 {
 	enum tfa_error err;
 	int no_clk=0;
@@ -3901,11 +3893,7 @@ int tfa_plop_noise_interrupt(struct tfa_device *tfa, int profile, int vstep)
 		if (no_clk == 1) {
 			/* Clock is lost. Set I2CR to remove POP noise */
 			pr_info("No clock detected. Resetting the I2CR to avoid pop on 72! \n");
-#ifdef __KERNEL__
-			err = tfa_dev_start(tfa, profile, vstep, pcm_format);
-#else
 			err = tfa_dev_start(tfa, profile, vstep);
-#endif
 			if (err != tfa_error_ok) {
 				pr_err("Error loading i2c registers (tfa_dev_start), err=%d\n", err);
 			} else {

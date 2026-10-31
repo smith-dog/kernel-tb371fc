@@ -101,8 +101,6 @@ int tfa9894_send_chan_sel(struct tfa_device *tfa, const char *name, int sel)
 	if ((cur_spks == spks) && (cur_dcs == dcs))
 		return 0;
 
-	pr_info("tfa9894: chan_sel=%d to %s, spks %d->%d dcs %d->%d\n",
-		sel, name ? name : "tfa9894", cur_spks, spks, cur_dcs, dcs);
 
 	/* Fade the firmware volume down before disturbing the routing. */
 	for (i = 0; i < ARRAY_SIZE(tfa9894_vol_table); i++) {
