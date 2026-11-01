@@ -1942,12 +1942,14 @@ static int tfa98xx_create_controls(struct tfa98xx *tfa98xx)
 	ret = snd_soc_add_component_controls(tfa98xx->component, tfa987x_algo_controls, ARRAY_SIZE(tfa987x_algo_controls));
 	pr_debug("create tfa987x_algo_controls  ret=%d", ret);
 #endif
-	if (!ret && (tfa98xx->tfa->tfa_family == 2) &&
-	    ((tfa98xx->tfa->rev & 0xff) == 0x94)) {
-		ret = snd_soc_add_component_controls(tfa98xx->component,
-				tfa9894_chan_sel_controls,
-				ARRAY_SIZE(tfa9894_chan_sel_controls));
-	}
+	/*
+	 * stock parity (W90-D121): the chan_sel slot is registered
+	 * unconditionally by container_loaded (stock 0x15a3c..0x15ad8 fills
+	 * both stereo and chan_sel slots on every device; no family/rev gate).
+	 */
+	ret = snd_soc_add_component_controls(tfa98xx->component,
+			tfa9894_chan_sel_controls,
+			ARRAY_SIZE(tfa9894_chan_sel_controls));
 #else
 
 	ret = snd_soc_add_codec_controls(tfa98xx->codec, tfa98xx_controls, mix_index);
@@ -1956,12 +1958,10 @@ static int tfa98xx_create_controls(struct tfa98xx *tfa98xx)
 	ret = snd_soc_add_codec_controls(tfa98xx->codec, tfa987x_algo_controls, ARRAY_SIZE(tfa987x_algo_controls));
 	pr_debug("create tfa987x_algo_controls  ret=%d", ret);
 #endif
-	if (!ret && (tfa98xx->tfa->tfa_family == 2) &&
-	    ((tfa98xx->tfa->rev & 0xff) == 0x94)) {
-		ret = snd_soc_add_codec_controls(tfa98xx->codec,
-				tfa9894_chan_sel_controls,
-				ARRAY_SIZE(tfa9894_chan_sel_controls));
-	}
+	/* stock parity (W90-D121): unconditional registration, see above. */
+	ret = snd_soc_add_codec_controls(tfa98xx->codec,
+			tfa9894_chan_sel_controls,
+			ARRAY_SIZE(tfa9894_chan_sel_controls));
 #endif
 	return ret;
 }
@@ -3583,9 +3583,13 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 			break;
 		case 0x94: /* tfa9894 */
 			pr_info("TFA9894 detected\n");
+			/* stock parity (W90-D120): rev 0x94 arm sets MULTI_MIC|TDM only
+			 * (stock flags word 0x108, no SKIP_INTERRUPTS).  The runtime
+			 * SKIP set in tfa98xx_i2c_probe (invalid/absent irq-gpio) is the
+			 * stock mechanism and stays untouched.
+			 */
 			tfa98xx->flags |= TFA98XX_FLAG_MULTI_MIC_INPUTS;
 			tfa98xx->flags |= TFA98XX_FLAG_TDM_DEVICE;
-			tfa98xx->flags |= TFA98XX_FLAG_SKIP_INTERRUPTS;
 			break;
 		case 0x80: /* tfa9890 */
 		case 0x81: /* tfa9890 */
