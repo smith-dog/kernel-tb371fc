@@ -258,6 +258,145 @@ static int tfa9894_set_chan_sel_ctl(struct snd_kcontrol *kcontrol,
 	return change;
 }
 
+/*
+ * stock parity (W90-D118): TFA_CHIP_SELECTOR ("stereo" selector) control.
+ *
+ * Recovered from the shipped module: the control is registered unconditionally
+ * by tfa98xx_container_loaded() (stock 0x15a10..0x15ad8 -- the revision/flags
+ * gated slot is the *previous* one, and the tbz at 0x15970 jumps to 0x15a10,
+ * i.e. exactly this slot's fill code, so both paths register it).  Our tree
+ * had no counterpart at all.
+ *
+ * Storage is a per-device dword (stock tfa98xx+0x424) whose bit 16 is the
+ * only bit these handlers ever touch, plus a module-global mirror of the last
+ * selector written by userspace (stock .bss+0x6c).  Stock writes the mirror
+ * *before* taking the lock; that ordering is reproduced verbatim.
+ */
+static int tfa98xx_stereo_selector;
+
+static int tfa98xx_info_stereo_ctl(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 7;	/* stock mov w10, #0x7 -> max */
+
+	return 0;
+}
+
+/*
+ * stock reads two 16-bit container header words for these prints:
+ * ldrh [cnt,#0x2]  -> the version field ("V_" + digits), and
+ * ldrh [cnt,#0x28] -> the device-list count (ndev).
+ * Take them through the struct rather than by offset so the packing rules of
+ * tfa98xx_parameters.h stay in charge.
+ */
+static unsigned int tfa98xx_container_version_word(struct nxpTfaContainer *cnt)
+{
+	if (!cnt)
+		return 0;
+
+	return (unsigned int)((u8)cnt->version[0] | ((u8)cnt->version[1] << 8));
+}
+
+static unsigned int tfa98xx_container_ndev_word(struct nxpTfaContainer *cnt)
+{
+	if (!cnt)
+		return 0;
+
+	return cnt->ndev;
+}
+
+static int tfa98xx_get_stereo_ctl(struct snd_kcontrol *kcontrol,
+				  struct snd_ctl_elem_value *ucontrol)
+{
+	struct tfa98xx *tfa98xx;
+
+	/*
+	 * stock 0x16bc0..0x16c64.  Per device: print "%s(): tfa98xx:
+	 * tfa98xx_get_stereo_ctl %d, 0x%x" with the device flag and the
+	 * container version word (stock ldrh [cnt,#0x2]), and store the
+	 * module-global selector into ucontrol *inside* the loop
+	 * (stock 0x16c4c/0x16c50).  An empty list leaves ucontrol untouched.
+	 */
+	mutex_lock(&tfa98xx_mutex);
+	list_for_each_entry(tfa98xx, &tfa98xx_device_list, list) {
+		struct nxpTfaContainer *cnt = tfa98xx->tfa->cnt;
+
+		printk(KERN_ERR "%s(): tfa98xx: tfa98xx_get_stereo_ctl %d, 0x%x\n",
+		       __func__, tfa98xx->stereo_flag,
+		       tfa98xx_container_version_word(cnt));
+		ucontrol->value.integer.value[0] = tfa98xx_stereo_selector;
+	}
+	mutex_unlock(&tfa98xx_mutex);
+
+	return 0;
+}
+
+static int tfa98xx_set_stereo_ctl(struct snd_kcontrol *kcontrol,
+				  struct snd_ctl_elem_value *ucontrol)
+{
+	struct tfa98xx *tfa98xx;
+	int selector = ucontrol->value.integer.value[0];
+
+	tfa98xx_stereo_selector = selector;	/* stock 0x16c90: stored before mutex_lock */
+	mutex_lock(&tfa98xx_mutex);
+	list_for_each_entry(tfa98xx, &tfa98xx_device_list, list) {
+		struct nxpTfaContainer *cnt = tfa98xx->tfa->cnt;
+		unsigned int version = tfa98xx_container_version_word(cnt);
+		unsigned int flag = tfa98xx->stereo_flag;
+
+		/*
+		 * stock dispatch, per device, in this exact order:
+		 *   0x16cd4 cmp #5 / 0x16cdc cbnz -> selector 5, 0, or "other"
+		 *   "other" -> 0x16d9c cmp #4 (b.gt = >4) then 0x16da4
+		 *             cmp (selector-1),#3 (b.hi = negative or >4)
+		 *             then the 4-entry jump table for 1..4
+		 * every arm ends in the 0x2bcf status print
+		 *   "%s(): %s: 0x%x flag is 0x%x, selector=%d"
+		 * (both %s are the function name, 0x%x #1 = container version
+		 * word, then the *new* flag and the selector).
+		 * selector > 4 additionally prints the 0x2b7b error line first
+		 * and still sets the stereo bit (stock 0x16dec/0x16df0).
+		 */
+		if (selector > 4) {
+			tfa98xx->stereo_flag = flag | 0x10000;
+			printk(KERN_ERR "%s(): tfa98xx: set_stereo_ctl error, selector=%d, ndev=%d\n",
+			       __func__, selector,
+			       tfa98xx_container_ndev_word(cnt));
+		} else if (selector == 0) {
+			tfa98xx->stereo_flag = flag | 0x10000;
+		} else if (selector == 5) {
+			tfa98xx->stereo_flag = flag & ~0x10000;
+		} else if (selector >= 1) {
+			/* stock arms 0x16dbc/0x16e04/0x16e20/0x16e3c */
+			if (tfa98xx->tfa->dev_idx == selector - 1)
+				tfa98xx->stereo_flag = flag | 0x10000;
+			else
+				tfa98xx->stereo_flag = flag & ~0x10000;
+		}
+		/* selector < 0: stock falls straight through to the print */
+
+		printk(KERN_ERR "%s(): %s: 0x%x flag is 0x%x, selector=%d\n",
+		       __func__, __func__, version, tfa98xx->stereo_flag,
+		       selector);
+	}
+	mutex_unlock(&tfa98xx_mutex);
+
+	return 0;
+}
+
+static const struct snd_kcontrol_new tfa98xx_stereo_controls[] = {
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "TFA_CHIP_SELECTOR",
+		.info = tfa98xx_info_stereo_ctl,
+		.get = tfa98xx_get_stereo_ctl,
+		.put = tfa98xx_set_stereo_ctl,
+	},
+};
+
 static const struct snd_kcontrol_new tfa9894_chan_sel_controls[] = {
 	SOC_SINGLE_EXT("TFA9894_CHAN_SELECTOR", 0, 0, 3, 0,
 		tfa9894_get_chan_sel_ctl, tfa9894_set_chan_sel_ctl),
@@ -1784,6 +1923,20 @@ static int tfa98xx_create_controls(struct tfa98xx *tfa98xx)
 	}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,18,0)
 	ret = snd_soc_add_component_controls(tfa98xx->component, tfa98xx_controls, mix_index);
+
+	/*
+	 * stock parity (W90-D118): TFA_CHIP_SELECTOR is registered unconditionally
+	 * by container_loaded (stock 0x15ad8, count = slots filled + 2), i.e. it is
+	 * not gated on tfa_family or revision the way TFA9894_CHAN_SELECTOR is.
+	 */
+	{
+		int ret2 = snd_soc_add_component_controls(tfa98xx->component,
+				tfa98xx_stereo_controls,
+				ARRAY_SIZE(tfa98xx_stereo_controls));
+
+		if (ret2)
+			ret = ret2;
+	}
 
 #ifdef TFA_NON_DSP_SOLUTION
 	ret = snd_soc_add_component_controls(tfa98xx->component, tfa987x_algo_controls, ARRAY_SIZE(tfa987x_algo_controls));

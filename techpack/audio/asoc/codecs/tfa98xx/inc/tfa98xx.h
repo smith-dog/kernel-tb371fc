@@ -139,6 +139,12 @@ struct tfa98xx {
 	unsigned int tapdet_profiles;	/* tapdet profile bitfield */
 	bool tapdet_poll;		/* tapdet running on polling mode */
 
+	/*
+	 * stock parity (W90-D118): per-device stereo selector state word.  Stock
+	 * keeps it at tfa98xx+0x424 (i.e. list+0x64) and only the
+	 * TFA_CHIP_SELECTOR handlers touch bit 16.
+	 */
+	unsigned int stereo_flag;
 	unsigned int rate_constraint_list[TFA98XX_NUM_RATES];
 	struct snd_pcm_hw_constraint_list rate_constraint;
 
