@@ -996,6 +996,10 @@ int tfa_needs_reset(struct tfa_device *tfa);
 
 int tfa_is_cold(struct tfa_device *tfa);
 
+/* stock parity (W90-D117): TDM bitwidth programming, stock @.text+0x6b08 */
+enum Tfa98xx_Error tfa_dev_set_tdm_bitwidth(struct tfa_device *tfa,
+					    int bitwidth);
+
 void tfa_set_query_info(struct tfa_device *tfa);
 
 int tfa_get_pga_gain(struct tfa_device *tfa);

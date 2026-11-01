@@ -234,6 +234,7 @@ void tfa_set_query_info(struct tfa_device *tfa)
 	tfa->is_probus_device = 0;
 	tfa->tfa_family = 1;
 	tfa->daimap = Tfa98xx_DAI_I2S;		/* all others */
+	tfa->pcm_sample_format = -1;	/* stock tfa_set_query_info 0x5f4: str -1 -> tfa+0x10 */
 	tfa->spkr_count = 1;
 	tfa->spkr_select = 0;
 	tfa->support_tcoef = supportYes;
@@ -2733,54 +2734,216 @@ enum Tfa98xx_Error tfaRunStartDSP(struct tfa_device *tfa)
  */
 
 /*
- * stock parity (W90-F2): TDM bitwidth configuration
- * stock @0x6b08, called from tfaRunStartup + tfa98xx_hw_params
- * bitwidth: 32->SLLN=31,SSIZE=23; 24->SLLN=31,SSIZE=23; 16->SLLN=15,SSIZE=15
- * NBCK=2 (both families)
- * per-rev BF selection handled by TFA_SET_BF via dev_ops (stock jump table equivalent)
+ * stock parity (W90-D117): TDM bitwidth configuration
+ * stock tfa_dev_set_tdm_bitwidth @.text+0x6b08.
+ *
+ * Recovered from the shipped vendor module through two independent channels
+ * (Ghidra 12.1.4 pseudocode, plus a byte-level decode of the revision jump
+ * table and of every read-modify-write block).  The facts reproduced here:
+ *
+ *   - bitfield coordinates are selected per die revision by a 35-entry table
+ *     (.rodata+0x142, index = (rev & 0xff) - 0x72, arm base 0x6bdc, dispatch
+ *     0x6bc4..0x6bd8).  rev 0x94 (this device, TFA9894) selects the 9894
+ *     arm at 0x6c88; every other in-range revision keeps the N1C/9912
+ *     coordinates preset at 0x6ba4..0x6bb0.
+ *   - registers are programmed through ops->tfa_reg_read()/tfa_reg_write()
+ *     read-modify-write pairs, never through tfa_set_bf().
+ *   - a read that fails with -100 (Tfa98xx_Error_RpcBase) is tolerated; other
+ *     read errors print "Error getting bf" and skip that field.  A failed
+ *     write prints "Error setting bf".  Neither aborts the sequence.
+ *   - the only error return is -22 (-EINVAL) for an illegal bitwidth
+ *     (stock 0x6c68: mov w0, #-0x16).
+ *   - both callers gate on tfa->pcm_sample_format == 3, so with the factory
+ *     default (module parameter not set => 0) this path never runs.
  */
-enum Tfa98xx_Error tfa_dev_set_tdm_bitwidth(struct tfa_device *tfa, int bitwidth)
-{
-	int slln, ssize, nbck = 2;
-	enum Tfa98xx_Error err;
 
-	switch (bitwidth) {
-	case 32:
-		if (tfa->tfa_family == 2) {
-			slln = 31; ssize = 23;
-		} else {
-			slln = 31; ssize = 23;
-			nbck = 2;
-		}
-		break;
-	case 24:
-		if (tfa->tfa_family == 2) {
-			slln = 31; ssize = 23;
-		} else {
-			slln = 31; ssize = 23;
-			nbck = 2;
-		}
-		break;
-	case 16:
-		slln = 15; ssize = 15;
-		break;
-	default:
-		pr_err("unsupported tdm bitwidth:%d\n", bitwidth);
-		return Tfa98xx_Error_Bad_Parameter;
+/* bitfield encoding, same layout as tfa_set_bf(): reg/pos/len */
+#define TFA_TDM_BF_REG(bf)		(((bf) >> 8) & 0xff)
+#define TFA_TDM_BF_POS(bf)		(((bf) >> 4) & 0xf)
+#define TFA_TDM_BF_LEN(bf)		(((bf) & 0xf) + 1)
+#define TFA_TDM_BF_MSK(bf)	\
+	(((((1u << TFA_TDM_BF_LEN(bf)) - 1) << TFA_TDM_BF_POS(bf))) & 0xffff)
+
+enum tfa_tdm_op {
+	TFA_TDM_OP_RMW,		/* wipe clear_msk, insert (value << shift) & ins_msk */
+	TFA_TDM_OP_CLRBIT,	/* wipe single bit 'shift'                     */
+	TFA_TDM_OP_SETBIT,	/* raise single bit 'shift'                    */
+};
+
+/*
+ * One read-modify-write step, mirroring stock 0x6bf8..0x714c including the
+ * "skip the write when the 16-bit register image is unchanged" test
+ * (cmp w8, w2 / cmp w9, w2, uxth).
+ *
+ * clear_msk is the range the stock AND instruction wipes and ins_msk is the
+ * range its insert instruction can actually set.  The two differ in the
+ * family-1 chain (see the call-site notes), which is stock behaviour.
+ *
+ * A read failing with anything other than -100 (Tfa98xx_Error_RpcBase) prints
+ * "Error getting bf" and leaves the register alone; a failed write prints
+ * "Error setting bf".  Neither aborts the sequence.
+ */
+static void tfa_tdm_rmw(struct tfa_device *tfa, unsigned char reg,
+			unsigned short clear_msk, unsigned short ins_msk,
+			unsigned int shift, enum tfa_tdm_op op, int value)
+{
+	unsigned short regval = 0;
+	unsigned short newval;
+	int err;
+
+	err = (tfa->dev_ops.tfa_reg_read)(tfa, reg, &regval);
+	if (err != -Tfa98xx_Error_RpcBase && err != Tfa98xx_Error_Ok) {
+		printk(KERN_ERR "Error getting bf :%d \n",
+		       -Tfa98xx_Error_RpcBase - err);
+		return;
 	}
 
-	err = TFA_SET_BF(tfa, TDMNBCK, nbck);
-	if (err != Tfa98xx_Error_Ok)
-		goto error_exit;
+	regval &= 0xffff;
+	switch (op) {
+	case TFA_TDM_OP_CLRBIT:
+		newval = regval & ~(1u << shift);
+		break;
+	case TFA_TDM_OP_SETBIT:
+		newval = regval | (1u << shift);
+		break;
+	case TFA_TDM_OP_RMW:
+	default:
+		newval = (regval & ~clear_msk) | ((value << shift) & ins_msk);
+		break;
+	}
+	newval &= 0xffff;
 
-	err = TFA_SET_BF(tfa, TDMSLLN, slln);
-	if (err != Tfa98xx_Error_Ok)
-		goto error_exit;
+	if (regval == newval)
+		return;
 
-	err = TFA_SET_BF(tfa, TDMSSIZE, ssize);
+	err = (tfa->dev_ops.tfa_reg_write)(tfa, reg, newval);
+	if (err != -Tfa98xx_Error_RpcBase && err != Tfa98xx_Error_Ok)
+		printk(KERN_ERR "Error setting bf :%d \n",
+		       -Tfa98xx_Error_RpcBase - err);
+}
 
-error_exit:
-	return err;
+/* field-addressed form: one mask serves both the wipe and the insert */
+static void tfa_tdm_rmw_bf(struct tfa_device *tfa, uint16_t bf,
+			   enum tfa_tdm_op op, int value)
+{
+	tfa_tdm_rmw(tfa, TFA_TDM_BF_REG(bf), TFA_TDM_BF_MSK(bf),
+		    TFA_TDM_BF_MSK(bf), TFA_TDM_BF_POS(bf), op, value);
+}
+
+/*
+ * TFA1 die chain, stock 0x6bec..0x70a4.  It is entered only for a TDM-wired
+ * device (stock 0x6bf0: cmp tfa->daimap, #Tfa98xx_DAI_TDM; otherwise no
+ * register is touched and the function reports success).
+ *
+ * The wipe/insert masks below are lifted from the stock immediates, which do
+ * not uniformly match the field metadata -- this is deliberate:
+ *   0x6c1c and w8, #0xfffffff7  wipe bit 3        (TFA1_BF_TDMEN 0x1030)
+ *   0x6d44 and w8, #0xfff       wipe bits 12..15, but 0x6d48 bfi #12,#2
+ *                               can only set two bits -> ins_msk 0x3000
+ *   0x6e60 and w8, #0xfffffe0f  wipe bits 4..8 (0x1f0), 0x6e68 orr w23 << 4
+ *   0x6f7c and w8, #0xffff83ff  wipe bits 10..14, 0x6f84 orr w22 << 10
+ *                               (TFA1_BF_TDMSAMSZ 0x10a4)
+ *   0x7098 orr w8, #0x8         raise bit 3 (TDMEN back on)
+ */
+static void tfa_dev_set_tdm_bitwidth_tfa1(struct tfa_device *tfa, int nbck,
+					 int slln, int ssize)
+{
+	if (tfa->daimap != Tfa98xx_DAI_TDM)
+		return;
+
+	tfa_tdm_rmw(tfa, 0x10, 0x0008, 0x0008, 3, TFA_TDM_OP_CLRBIT, 0);
+	tfa_tdm_rmw(tfa, 0x14, 0xf000, 0x3000, 12, TFA_TDM_OP_RMW, nbck);
+	tfa_tdm_rmw(tfa, 0x11, 0x01f0, 0x01f0, 4, TFA_TDM_OP_RMW, slln);
+	tfa_tdm_rmw(tfa, 0x10, 0x7c00, 0x7c00, 10, TFA_TDM_OP_RMW, ssize);
+	tfa_tdm_rmw(tfa, 0x10, 0x0008, 0x0008, 3, TFA_TDM_OP_SETBIT, 0);
+}
+
+enum Tfa98xx_Error tfa_dev_set_tdm_bitwidth(struct tfa_device *tfa, int bitwidth)
+{
+	uint16_t bf_ssize, bf_slln, bf_nbck, bf_tdme;
+	int nbck, slln, ssize;
+	unsigned char rev = (unsigned char)(tfa->rev & 0xff);
+
+	/* preset installed at stock 0x6ba4..0x6bb0 (N1C coordinates) */
+	bf_ssize = TFA2_BF_TDMSSIZE;
+	bf_slln = TFA2_BF_TDMSLLN;
+	bf_nbck = TFA2_BF_TDMNBCK;
+	bf_tdme = TFA2_BF_TDME;
+
+	if (bitwidth == 32 || bitwidth == 24) {
+		slln = 31;
+		ssize = 23;
+		nbck = 2;
+		if (tfa->tfa_family == 1) {
+			tfa_dev_set_tdm_bitwidth_tfa1(tfa, nbck, slln, ssize);
+			return Tfa98xx_Error_Ok;
+		}
+		/* stock 0x6b88..0x6b94: a probus die uses the slot length as
+		 * the sample size (csel w22, w23, w22, eq).
+		 */
+		if (tfa->is_probus_device == 1)
+			ssize = slln;
+		if (tfa->tfa_family != 2) {
+			tfa_dev_set_tdm_bitwidth_tfa1(tfa, nbck, slln, ssize);
+			return Tfa98xx_Error_Ok;
+		}
+	} else if (bitwidth == 16) {
+		nbck = 0;
+		slln = 15;
+		ssize = 15;
+		if (tfa->tfa_family != 2) {
+			tfa_dev_set_tdm_bitwidth_tfa1(tfa, nbck, slln, ssize);
+			return Tfa98xx_Error_Ok;
+		}
+	} else {
+		printk(KERN_ERR "unsupported tdm bitwidth:%d\n", bitwidth);
+		return -EINVAL;
+	}
+
+	/*
+	 * stock 0x6bb4..0x6bd8 jump table, 35 entries (rev 0x72..0x94);
+	 * out of range -> 0x6c70, where only rev 0x13 stays silent.
+	 */
+	if (rev >= 0x72 && rev <= 0x94) {
+		switch (rev) {
+		case 0x72:
+		case 0x74:
+			/* value 47 -> 0x6c98: preset coords, TDME 0x2040 */
+			break;
+		case 0x73:
+		case 0x78:
+			/* value 0 -> 0x6bdc: keeps the preset N1C coordinates
+			 * but reloads TDME with the immediate 0x2000 (reg 0x20
+			 * bit 0) installed at stock 0x6c94.
+			 */
+			bf_tdme = TFA_MK_BF(0x20, 0, 1);
+			break;
+		case 0x94:
+			/* value 43 -> 0x6c88: TFA9894 coords, TDME 0x2000 */
+			bf_ssize = TFA9894_BF_TDMSSIZE;
+			bf_slln = TFA9894_BF_TDMSLLN;
+			bf_nbck = TFA9894_BF_TDMNBCK;
+			bf_tdme = TFA9894_BF_TDME;
+			break;
+		default:
+			/* value 39 -> 0x6c78: print, preset coords, TDME
+			 * 0x2040 (the branch re-joins past 0x6c94) */
+			printk(KERN_ERR "unsuported device rev:%x\n", rev);
+			break;
+		}
+	} else {
+		if (rev != 0x13)
+			printk(KERN_ERR "unsuported device rev:%x\n", rev);
+	}
+
+	/* stock order: TDME clear -> NBCK -> SLLN -> SSIZE -> TDME set */
+	tfa_tdm_rmw_bf(tfa, bf_tdme, TFA_TDM_OP_CLRBIT, 0);
+	tfa_tdm_rmw_bf(tfa, bf_nbck, TFA_TDM_OP_RMW, nbck);
+	tfa_tdm_rmw_bf(tfa, bf_slln, TFA_TDM_OP_RMW, slln);
+	tfa_tdm_rmw_bf(tfa, bf_ssize, TFA_TDM_OP_RMW, ssize);
+	tfa_tdm_rmw_bf(tfa, bf_tdme, TFA_TDM_OP_SETBIT, 0);
+
+	return Tfa98xx_Error_Ok;
 }
 
 /* stock parity (W90-F2): tfa_is_94_N2_device - 9894 N2 revision check
@@ -2886,6 +3049,21 @@ enum Tfa98xx_Error tfaRunStartup(struct tfa_device *tfa, int profile)
 		pr_debug("\nWarning: No init keyword found in the cnt file. Init is skipped! \n");
 	}
 
+	/*
+	 * stock parity (W90-D117): tfaRunStartup 0x5b38..0x5b58 tests
+	 * tfa->pcm_sample_format == 3 (the module parameter published by
+	 * tfa98xx_hw_params) and programs the TDM bitwidth *before* the
+	 * container register lists are written -- so the container cannot
+	 * silently overwrite it.  A failure returns 3 without running the
+	 * rest of the start-up sequence.  With the factory default (parameter
+	 * not set => 0) this path does not run, matching stock.
+	 */
+	if (tfa->pcm_sample_format == 3) {
+		err = tfa_dev_set_tdm_bitwidth(tfa, tfa->bitwidth);
+		if (err)
+			return 3;
+	}
+
 	/* I2S settings to define the audio input properties
 	 *  these must be set before the subsys is up */
 	// this will run the list until a non-register item is encountered
@@ -2898,13 +3076,6 @@ enum Tfa98xx_Error tfaRunStartup(struct tfa_device *tfa, int profile)
 
 	/* Factory trimming for the Boost converter */
 	tfa98xx_factory_trimmer(tfa);
-
-	/* stock parity: TDM bitwidth setting (W90-F2) */
-	if (tfa->daimap & Tfa98xx_DAI_TDM) {
-		err = tfa_dev_set_tdm_bitwidth(tfa, tfa->bitwidth);
-		if (err)
-			return 3;
-	}
 
 	/* Go to the initCF state */
 	tfa_dev_set_state(tfa, TFA_STATE_INIT_CF, strstr(tfaContProfileName(tfa->cnt, tfa->dev_idx, profile), ".cal") != NULL);

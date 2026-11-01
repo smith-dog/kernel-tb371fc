@@ -123,6 +123,19 @@ static int pcm_no_constraint = 0;
 module_param(pcm_no_constraint, int, S_IRUGO);
 MODULE_PARM_DESC(pcm_no_constraint, "do not use constraints for PCM parameters\n");
 
+/*
+ * stock parity (W90-D117): the vendor module exposes pcm_sample_format as an
+ * int module parameter (stock .bss+0x34, param_ops_int, .rodata string
+ * "PCM sample format: 0=S16_LE, 1=S24_LE, 2=S32_LE, 3=dynamic").  It selects
+ * the PCM format constraint applied by tfa98xx_startup() and, when it equals
+ * 3, enables the per-bitwidth TDM programming in tfaRunStartup()/
+ * tfa98xx_hw_params().  .bss default is 0, and nothing in the shipped vendor
+ * image passes the parameter, so on stock the TDM bitwidth path never runs.
+ */
+static int pcm_sample_format;
+module_param(pcm_sample_format, int, S_IRUGO);
+MODULE_PARM_DESC(pcm_sample_format, "PCM sample format: 0=S16_LE, 1=S24_LE, 2=S32_LE, 3=dynamic\n");
+
 static void tfa98xx_tapdet_check_update(struct tfa98xx *tfa98xx);
 static int tfa98xx_get_fssel(unsigned int rate);
 static void tfa98xx_interrupt_enable(struct tfa98xx *tfa98xx, bool enable);
@@ -2624,6 +2637,26 @@ static void tfa98xx_interrupt(struct work_struct *work)
 	 tfa_irq_unmask(tfa98xx->tfa);
 }
 
+/*
+ * stock parity (W90-D117): mask table at .rodata+0x860, indexed by
+ * pcm_sample_format while the value is < 3; 0x444 is the stock immediate
+ * used for every other selector (including 3 = dynamic).
+ */
+static u64 tfa_pcm_format_mask(int pcm_sample_format)
+{
+	static const u64 masks[] = {
+		SNDRV_PCM_FMTBIT_S16_LE,
+		SNDRV_PCM_FMTBIT_S24_LE,
+		SNDRV_PCM_FMTBIT_S32_LE,
+	};
+
+	if (pcm_sample_format >= 0 && pcm_sample_format < 3)
+		return masks[pcm_sample_format];
+
+	return SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE |
+	       SNDRV_PCM_FMTBIT_S32_LE;
+}
+
 static int tfa98xx_startup(struct snd_pcm_substream *substream,
 						struct snd_soc_dai *dai)
 {
@@ -2635,7 +2668,7 @@ static int tfa98xx_startup(struct snd_pcm_substream *substream,
 	struct tfa98xx *tfa98xx = snd_soc_codec_get_drvdata(codec);
 #endif
 	unsigned int sr;
-	int len, prof, nprof, idx = 0;
+	int len, prof, nprof, idx = 0, ret;
 	char *basename;
 
 	/*
@@ -2647,6 +2680,19 @@ static int tfa98xx_startup(struct snd_pcm_substream *substream,
 
 	if (pcm_no_constraint != 0)
 		return 0;
+
+	/*
+	 * stock parity (W90-D117): tfa98xx_startup 0x14194..0x141c0 applies a
+	 * PCM format mask chosen from the pcm_sample_format module parameter
+	 * (table .rodata+0x860 = {S16_LE, S24_LE, S32_LE}, anything else
+	 * including the 'dynamic' selector 3 falls back to the 0x444 =
+	 * S16|S24|S32 immediate) *before* the no_start gate is consulted.
+	 */
+	ret = snd_pcm_hw_constraint_mask64(substream->runtime,
+					   SNDRV_PCM_HW_PARAM_FORMAT,
+					   tfa_pcm_format_mask(pcm_sample_format));
+	if (ret < 0)
+		return ret;
 
 	if (no_start != 0)
 		return 0;
@@ -2690,8 +2736,16 @@ static int tfa98xx_startup(struct snd_pcm_substream *substream,
 
 	kfree(basename);
 
-/* as QUALCOMM FAE suggested, we don't need to calling 'snd_pcm_hw_constraint_list' on QUALCOMM platform. */
-	return 0;
+	/*
+	 * stock parity (W90-D117): the shipped module still calls
+	 * snd_pcm_hw_constraint_list() here (stock tfa98xx_startup 0x1437c,
+	 * param 0xb = SNDRV_PCM_HW_PARAM_RATE, class 0), so the rate list
+	 * collected above is actually applied.  The old 'QUALCOMM FAE' comment
+	 * that skipped it is not vendor behaviour.
+	 */
+	return snd_pcm_hw_constraint_list(substream->runtime, 0,
+					  SNDRV_PCM_HW_PARAM_RATE,
+					  &tfa98xx->rate_constraint);
 }
 
 static int tfa98xx_set_dai_sysclk(struct snd_soc_dai *codec_dai,
@@ -2767,12 +2821,33 @@ static int tfa98xx_hw_params(struct snd_pcm_substream *substream,
 #endif
 	unsigned int rate;
 	int prof_idx;
+	enum Tfa98xx_Error err;
 
 	/* Supported */
 	rate = params_rate(params);
 
+	/*
+	 * stock parity (W90-D117): tfa98xx_hw_params 0x14404/0x14410 writes
+	 * both tfa->bitwidth and tfa->pcm_sample_format *before* the no_start
+	 * gate, so the values are published even when startup is suppressed.
+	 */
+	tfa98xx->tfa->bitwidth = snd_pcm_format_width(params_format(params));
+	tfa98xx->tfa->pcm_sample_format = pcm_sample_format;
+
 	if (no_start != 0)
 		return 0;
+
+	/*
+	 * stock 0x14424: the TDM bitwidth is only reprogrammed when the module
+	 * parameter selects "dynamic" format negotiation (== 3).  Any other
+	 * value leaves the container-provided TDM configuration in place.
+	 */
+	if (tfa98xx->tfa->pcm_sample_format == 3) {
+		err = tfa_dev_set_tdm_bitwidth(tfa98xx->tfa,
+					      tfa98xx->tfa->bitwidth);
+		if (err)
+			return -EINVAL;
+	}
 
 	/* check if samplerate is supported for this mixer profile */
 	prof_idx = get_profile_id_for_sr(tfa98xx_mixer_profile, rate);
@@ -2787,7 +2862,6 @@ static int tfa98xx_hw_params(struct snd_pcm_substream *substream,
 
 	/* update to new rate */
 	tfa98xx->rate = rate;
-	tfa98xx->tfa->bitwidth = snd_pcm_format_width(params_format(params));
 
 	return 0;
 }
