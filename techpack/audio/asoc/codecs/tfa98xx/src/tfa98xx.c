@@ -79,7 +79,16 @@ static nxpTfaContainer_t *tfa98xx_container = NULL;
 static int tfa98xx_kmsg_regs = 0;
 static int tfa98xx_ftrace_regs = 0;
 
-static char *fw_name = "tfa98xx_QS.cnt"; /* p247: TB371FC vendor container */
+/*
+ * stock parity (W90-D123): the container file is selected per device by the
+ * SPK-ID strap level (stock tfa98xx_i2c_probe 0x13630..0x136a0 reads GPIO 1171
+ * into tfa+0x3C0; the tail at 0x14b44 picks first/second by that value and
+ * stores the pointer at tfa+0x328).  Stock defaults: first = tfa98xx_YC.cnt,
+ * second = tfa98xx_QS.cnt (both .data ABS64 relocs to .rodata.str1.1);
+ * both params are charp with perm 0644 (stock __param entries verbatim).
+ */
+static char *fw_name_first = "tfa98xx_YC.cnt";
+static char *fw_name_second = "tfa98xx_QS.cnt";
 
 /* p249: sync-preload the container from /vendor/firmware into the kernel
  * firmware cache, so the later request_firmware() (which fires long after
@@ -89,20 +98,23 @@ static int __init p249_preload_container(void)
 	const struct firmware *fw = NULL;
 	int rc;
 
-	rc = request_firmware(&fw, fw_name, NULL);
-	if (rc == 0 && fw) {
+	/* prewarm both stock container names: which one a given device asks
+	 * for depends on its SPK-ID strap (see the probe selector below), and
+	 * both files ship in /vendor/firmware on this product. */
+	rc = request_firmware(&fw, fw_name_first, NULL);
+	if (rc == 0 && fw)
 		release_firmware(fw);
-		/* request_firmware caches until release; re-request later
-		 * hits the cache. To persist across the early probe we rely
-		 * on the cache holding the entry until the consumer loads. */
-	} else {
-	}
+	rc = request_firmware(&fw, fw_name_second, NULL);
+	if (rc == 0 && fw)
+		release_firmware(fw);
 	return 0;
 }
 late_initcall_sync(p249_preload_container);
 
-module_param(fw_name, charp, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(fw_name, "TFA98xx DSP firmware (container file) name.");
+module_param(fw_name_first, charp, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(fw_name_first, "TFA98xx DSP firmware (container file) name.");
+module_param(fw_name_second, charp, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(fw_name_second, "TFA98xx DSP firmware (container file) name.");
 
 static int trace_level = 0;
 module_param(trace_level, int, S_IRUGO);
@@ -2419,11 +2431,11 @@ static void tfa98xx_container_loaded(const struct firmware *cont, void *context)
 	tfa98xx->dsp_fw_state = TFA98XX_DSP_FW_FAIL;
 
 	if (!cont) {
-		pr_err("Failed to read %s\n", fw_name);
+		pr_err("Failed to read %s\n", tfa98xx->fw_name);
 		return;
 	}
 
-	pr_info("loaded %s - size: %zu\n", fw_name, cont->size);
+	pr_info("loaded %s - size: %zu\n", tfa98xx->fw_name, cont->size);
 
 	if (tfa98xx_container == NULL) {
 		container = kzalloc(cont->size, GFP_KERNEL);
@@ -2555,7 +2567,7 @@ static int tfa98xx_load_container(struct tfa98xx *tfa98xx)
 		mutex_unlock(&tfa98xx_mutex);
 		return 0;
 	}
-	rc = request_firmware(&firmware, fw_name, tfa98xx->dev);
+	rc = request_firmware(&firmware, tfa98xx->fw_name, tfa98xx->dev);
 	if (rc <0) {
 		mutex_unlock(&tfa98xx_mutex);
 		return rc;
@@ -3542,6 +3554,43 @@ static int tfa98xx_i2c_probe(struct i2c_client *i2c,
 		if (ret)
 			return ret;
 	}
+
+	/*
+	 * stock parity (W90-D123): SPK-ID strap detection.  Stock requests the
+	 * hard-wired gpio 1171 ("tfa98xx_spk_id", 0x13630) and fails the probe
+	 * when the request fails ("spk id request failed", 0x1365c), then reads
+	 * the raw level through two gpio_to_desc() round trips exactly as
+	 * stock 0x13664..0x1367c does, parks it in the device (stock tfa+0x3C0,
+	 * here the named spk_id_level field) and frees the line before
+	 * reporting "spk_gpio %d exit ,flag = %d" with the stock constant 71
+	 * (0x1369c).  The container-file selector in the probe tail reads this
+	 * value back (stock 0x14b44).
+	 */
+	ret = devm_gpio_request_one(&i2c->dev, 1171, GPIOF_DIR_IN,
+		"tfa98xx_spk_id");
+	if (ret) {
+		dev_err(&i2c->dev, "spk id request failed");
+		return ret;
+	}
+	{
+		struct gpio_desc *spk_desc = gpio_to_desc(1171);
+
+		gpiod_direction_input(spk_desc);
+		tfa98xx->spk_id_level = gpiod_get_raw_value(gpio_to_desc(1171));
+	}
+	gpio_free(1171);
+	dev_info(&i2c->dev, "spk_gpio %d exit ,flag = %d", 71,
+		tfa98xx->spk_id_level);
+
+	/*
+	 * stock parity (W90-D123): container-file selection (stock 0x14b44:
+	 * cbz tfa+0x3C0 -> second, otherwise first; pointer parked at
+	 * tfa+0x328, the named tfa98xx->fw_name member here).
+	 */
+	if (tfa98xx->spk_id_level == 0)
+		tfa98xx->fw_name = fw_name_second;
+	else
+		tfa98xx->fw_name = fw_name_first;
 
 	pr_info("addr=0x%x\n", i2c->addr);
 	/* Power up! */

@@ -127,6 +127,10 @@ struct tfa98xx {
 	int audio_mode;
 	struct tfa98xx_firmware fw;
 	char *fw_name;
+	/* stock parity (W90-D123): SPK-ID strap raw level, stock parks it at
+	 * tfa+0x3C0 (tfa98xx_i2c_probe 0x13680) and the container-file selector
+	 * reads it back at 0x14b44. */
+	int spk_id_level;
 	int rate;
 	wait_queue_head_t wq;
 	struct device *dev;
