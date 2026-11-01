@@ -98,12 +98,14 @@ static int __init p249_preload_container(void)
 	const struct firmware *fw = NULL;
 	int rc;
 
-	/* prewarm both stock container names: which one a given device asks
-	 * for depends on its SPK-ID strap (see the probe selector below), and
-	 * both files ship in /vendor/firmware on this product. */
-	rc = request_firmware(&fw, fw_name_first, NULL);
-	if (rc == 0 && fw)
-		release_firmware(fw);
+	/* Prewarm only the built-in container name: the other per-device name
+	 * (fw_name_first) is not in CONFIG_EXTRA_FIRMWARE, so requesting it at
+	 * late_initcall_sync triggers the firmware usermodehelper fallback on
+	 * the kernel_init thread (userland does not exist yet), which stalls
+	 * init long enough for the wlan MHI 10s timeout to fire a SYSTEM-level
+	 * subsystem restart -- the W90-D123 bootloop root cause.  The YC name
+	 * is resolved later, from the ueventd-served request_firmware() in
+	 * tfa98xx_dsp_load(), which is the stock timing. */
 	rc = request_firmware(&fw, fw_name_second, NULL);
 	if (rc == 0 && fw)
 		release_firmware(fw);
