@@ -14,6 +14,18 @@ driver-core `needs_suppliers` 链表、eMMC 调参 hold、TCP 数据竞争、
 early-entropy 初始化等，清单见下）。诊断插桩按发布惯例在本版关闭
 （dev 分支常驻，发布件 `strings Image` 已验无残留）。
 
+**v2.2 = 音频 TFA9894 簇全量原厂对齐 + issue #1 修复 + 启动稳定性修复**：对音频
+功放模块 `tfa98xx`（含 tfa9894 器件簇，对照 stock 原厂 `audio_tfa98xx.ko` 逐函数
+反汇编收口）完成函数面/语料/行为三层全量对齐（review 终判 PASS）：修复 **issue #1**
+的 VoIP 失真根因——删除我方自造的 `nxp34663` 错误寄存器写块，按 stock 反汇编重建
+`TDM 位宽配置路径`（per-rev 跳表 + `pcm_sample_format` 门控，默认关=stock 行为）；
+新增 **SPK-ID 硬件变体容器选择**（GPIO1171 strap 按 stock 0x13630/0x14b44 选择
+YC/QS 容器——修复 4 功放错跑错误补偿配置导致的音质问题，`tfa98xx_YC.cnt` 随
+CONFIG_EXTRA_FIRMWARE 内建）；新增 stereo 控件 `TFA_CHIP_SELECTOR` 与 chan_sel
+无条件注册（stock 形态）；VoIP 通话实机回归 PASS（失真消失、通话中零错误）。
+另含 bootloop 根因修复（firmware 预热阻塞 init）与键盘 i2c-hid 的 shutdown
+空指针防卫。发布构建 **#789**（诊断插桩按惯例关闭）。
+
 **v2.1 = 驱动原厂看齐收官 + KernelSU v3.3.1+**：完成全部 21 个驱动记账单元
 对 stock 原厂二进制的全链对齐复审（函数面 / 反汇编逐簇 / 打印语料 / DT
 消费链四层，裁决链全部落档），随复审修复一批真实缺陷——充电 charger 命令
@@ -84,10 +96,10 @@ Full patch history in
 
 **一枚内核、两种 root 形态，各一个镜像即完成全部安装（v1.5 起的形态，v2.0 沿用）。**
 
-1. 从 [Release v2.1](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v2.1)
-   下载 `boot-v2.1-kspatched-flash.img`（内嵌 `#743`，KernelSU v3.3.1+ LKM 已在内），
+1. 从 [Release v2.2](https://github.com/smith-dog/kernel-tb371fc/releases/tag/v2.2)
+   下载 `boot-v2.2-kspatched-flash.img`（内嵌 `#789`，KernelSU v3.3.1+ LKM 已在内），
    并安装同 Release 附带的 KernelSU 管理器 APK（v3.3.1+）。纯净镜像（无
-   KernelSU）= [`boot-v2.1-pure-flash.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v2.1/boot-v2.1-pure-flash.img)（同一枚 #743 + 原厂 ramdisk）。旧 v2.0 双镜像（#312 谱系）——两镜像内嵌 Image 字节相同，只差 ramdisk 里
+   KernelSU）= [`boot-v2.2-pure-flash.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v2.2/boot-v2.2-pure-flash.img)（同一枚 #789 + 原厂 ramdisk）。旧 v2.0 双镜像（#312 谱系）——两镜像内嵌 Image 字节相同，只差 ramdisk 里
    有没有 KernelSU：
    - [`boot-v2.0-kspatched-flash.img`](https://github.com/smith-dog/kernel-tb371fc/releases/download/v2.0/boot-v2.0-kspatched-flash.img)
      （md5 `b7f5b9284a14c8faabb0a6f6c7d379f6`）——KernelSU LKM 已内置，直刷即有 root
