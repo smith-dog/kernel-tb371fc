@@ -59,10 +59,10 @@ enum Tfa98xx_DAI {
 struct tfa_device_ops {
 	enum Tfa98xx_Error(*dsp_msg)(struct tfa_device *tfa, int length, const char *buf);
 	enum Tfa98xx_Error(*dsp_msg_read)(struct tfa_device *tfa, int length, unsigned char *bytes);
-	enum Tfa98xx_Error(*reg_read)(struct tfa_device *tfa, unsigned char subaddress, unsigned short *value);
-	enum Tfa98xx_Error(*reg_write)(struct tfa_device *tfa, unsigned char subaddress, unsigned short value);
-	enum Tfa98xx_Error(*mem_read)(struct tfa_device *tfa, unsigned int start_offset, int num_words, int *pValues);
-	enum Tfa98xx_Error(*mem_write)(struct tfa_device *tfa, unsigned short address, int value, int memtype);
+	enum Tfa98xx_Error(*tfa_reg_read)(struct tfa_device *tfa, unsigned char subaddress, unsigned short *value);
+	enum Tfa98xx_Error(*tfa_reg_write)(struct tfa_device *tfa, unsigned char subaddress, unsigned short value);
+	enum Tfa98xx_Error(*tfa_mem_read)(struct tfa_device *tfa, unsigned int start_offset, int num_words, int *pValues);
+	enum Tfa98xx_Error(*tfa_mem_write)(struct tfa_device *tfa, unsigned short address, int value, int memtype);
 
 	enum Tfa98xx_Error (*tfa_init)(struct tfa_device *tfa); /**< init typically for loading optimal settings */
 	enum Tfa98xx_Error (*dsp_reset)(struct tfa_device *tfa, int state); /**< reset the coolflux dsp */
@@ -128,6 +128,15 @@ struct tfa_device {
 	unsigned char spkr_select;
 	unsigned char support_tcoef;/**< legacy tfa9887, will be removed */
 	enum Tfa98xx_DAI daimap; /**< supported audio interface types */
+	/*
+	 * stock parity (W90-D117): tfa+0x10.  Copy of the module parameter
+	 * pcm_sample_format, written by tfa98xx_hw_params().  The TDM bitwidth
+	 * path only runs when this equals 3 ("dynamic" format selection).
+	 * Defaults to -1 from tfa_dev_set_query_info(), so the path is inert
+	 * until hw_params has been called -- same as stock.
+	 */
+	int pcm_sample_format; /**< PCM sample format selector (stock tfa+0x10) */
+	int bitwidth; /**< PCM sample width in bits (stock tfa+0x14) */
 	int mohm[3]; /**< speaker calibration values in milli ohms -1 is error */
 	struct tfa_device_ops dev_ops;
 	uint16_t interrupt_enable[3];
@@ -185,13 +194,7 @@ int tfa_dev_probe(int slave, struct tfa_device *tfa);
  *  @param vstep the selected vstep to use
  *  @return tfa_error enum
  */
-/*[nxp34663] CR: support 16bit/24bit/32bit audio data. begin*/
-#ifdef __KERNEL__
-enum tfa_error tfa_dev_start(struct tfa_device *tfa, int next_profile, int vstep, u8 pcm_format);
-#else
 enum tfa_error tfa_dev_start(struct tfa_device *tfa, int next_profile, int vstep);
-#endif
-/*[nxp34663] CR: support 16bit/24bit/32bit audio data. end*/
 
 /**
  * Stop audio for this instance as gracefully as possible.

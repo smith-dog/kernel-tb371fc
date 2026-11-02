@@ -508,7 +508,7 @@ static enum Tfa98xx_Error tfaContWriteVstepMax2_One(struct tfa_device *tfa, stru
 	}
 
 	if (use_partial_coeff) {
-		err = dsp_partial_coefficients(tfa, old_msg->ParameterData, new_msg->ParameterData);
+		err = tfa_dsp_partial_coefficients(tfa, old_msg->ParameterData, new_msg->ParameterData);
 	} else if (len) {
 		uint8_t *buffer;
 
@@ -660,6 +660,56 @@ enum Tfa98xx_Error tfaContWriteFile(struct tfa_device *tfa,  nxpTfaFileDsc_t *fi
 
 	if (tfa->verbose) {
 		tfaContShowHeader(hdr);
+	}
+
+	{
+		/* stock parity: FW API version check (tfaGetFwApiVersion path) */
+		int api_version[4] = {0};
+		char ver_str[3] = {0};
+		int hdr_minor = 0;
+		int i;
+		/* container subversion[0..1] = version string -> minor int */
+		ver_str[0] = hdr->subversion[0];
+		ver_str[1] = hdr->subversion[1];
+		if (sscanf(ver_str, "%d", &hdr_minor) < 1)
+			hdr_minor = 0;
+		if (hdr_minor < 1)
+			goto skip_api_check;
+		/* APIV marker at hdr+20..23 */
+		if (hdr->customer[0] != 65 /* A */ || hdr->customer[1] != 80 /* P */ ||
+			hdr->customer[2] != 73 /* I */ || hdr->customer[3] != 86 /* V */)
+			goto skip_api_check;
+		/* get FW API version via mem_read XMEM 0x209 (non-ext-dsp path) */
+		{
+			int fw_api = 0;
+			enum Tfa98xx_Error err2;
+			err2 = (tfa->dev_ops.tfa_mem_read)(tfa, 0x209, 1, &fw_api);
+			if (err2 != Tfa98xx_Error_Ok)
+				goto skip_api_check;
+			api_version[0] = (fw_api >> 24) & 0xff;
+			api_version[1] = (fw_api >> 16) & 0xff;
+			api_version[2] = (fw_api >> 8) & 0xff;
+			api_version[3] = fw_api & 0xff;
+		}
+		/* 4-seg compare vs container bytes hdr+24..27 */
+		{
+			unsigned char *cnt_ver = (unsigned char *)hdr + 24;
+			int mismatch = 0;
+			for (i = 0; i < 4; i++) {
+				if (api_version[i] != cnt_ver[i]) {
+					mismatch = 1;
+					break;
+				}
+			}
+			if (mismatch) {
+				pr_err("tfa98xx: ERROR %s:%d: Error: tfaContWriteFile: Expected FW API version = %d.%d.%d.%d, Msg File version: %d.%d.%d.%d \n",
+					__func__, __LINE__,
+					api_version[0], api_version[1], api_version[2], api_version[3],
+					cnt_ver[0], cnt_ver[1], cnt_ver[2], cnt_ver[3]);
+				return Tfa98xx_Error_Bad_Parameter;
+			}
+		}
+		skip_api_check:;
 	}
 
 	type = (nxpTfaHeaderType_t) hdr->id;
@@ -911,7 +961,7 @@ enum Tfa98xx_Error tfaRunReadBitfield(struct tfa_device *tfa,  nxpTfaBitfield_t 
 
 	bfUni.field = bf->field;
 
-	error = reg_read(tfa, (unsigned char)(bfUni.Enum.address), &regvalue);
+	error = tfa_reg_read(tfa, (unsigned char)(bfUni.Enum.address), &regvalue);
 	if (error) return error;
 
 	msk = ((1<<(bfUni.Enum.len+1))-1)<<bfUni.Enum.pos;
@@ -934,7 +984,7 @@ static enum Tfa98xx_Error tfaRunWriteDspMem(struct tfa_device *tfa, nxpTfaDspMem
 		if (tfa->verbose)
 			pr_debug("dsp mem (%d): 0x%02x=0x%04x\n", cfmem->type, cfmem->address, cfmem->words[i]);
 
-		error = mem_write(tfa, cfmem->address++, cfmem->words[i], cfmem->type);
+		error = tfa_mem_write(tfa, cfmem->address++, cfmem->words[i], cfmem->type);
 		if (error) return error;
 	}
 
@@ -1041,14 +1091,14 @@ static enum Tfa98xx_Error tfaRunWriteRegister(struct tfa_device *tfa, nxpTfaRegp
 	if (tfa->verbose)
 		pr_debug("register: 0x%02x=0x%04x (msk=0x%04x)\n", reg->address, reg->value, reg->mask);
 
-	error = reg_read(tfa, reg->address, &value);
+	error = tfa_reg_read(tfa, reg->address, &value);
 	if (error) return error;
 
 	value &= ~reg->mask;
 	newvalue = reg->value & reg->mask;
 
 	value |= newvalue;
-	error = reg_write(tfa,  reg->address, value);
+	error = tfa_reg_write(tfa,  reg->address, value);
 
 	return error;
 
@@ -1642,7 +1692,7 @@ enum Tfa98xx_Error tfaContWriteProfile(struct tfa_device *tfa, int prof_idx, int
 				tfaContGetString(tfa->cnt, &previous_prof->name), tfa_dev_get_swprof(tfa));
 	}
 
-	err = show_current_state(tfa);
+	err = tfa_show_current_state(tfa);
 
 	/* Loop profile length */
 	for(i=0;i<previous_prof->length;i++) {
@@ -1664,6 +1714,10 @@ enum Tfa98xx_Error tfaContWriteProfile(struct tfa_device *tfa, int prof_idx, int
 	if (tfa->verbose)
 		pr_debug("---------- new settings profile: %s (%d) ---------- \n", 
 				tfaContGetString(tfa->cnt, &prof->name), prof_idx);
+	if (strstr(tfaContGetString(tfa->cnt, &prof->name), ".standby") != NULL) {
+		pr_info("Keep power down without writing files, in standby profile!\n");
+		return Tfa98xx_Error_Ok;
+	}
 
 	/* set new settings */
 	for(i=0;i<prof->length;i++) {
@@ -1708,7 +1762,7 @@ enum Tfa98xx_Error tfaContWriteProfile(struct tfa_device *tfa, int prof_idx, int
 		err = tfa_cf_powerup(tfa);
 		if (err) return err;
 
-		err = show_current_state(tfa);
+		err = tfa_show_current_state(tfa);
 
 		if (tfa->tfa_family == 2) {
 			/* Reset SBSL to 0 (workaround of enbl_powerswitch=0) */
@@ -2167,14 +2221,14 @@ static void get_all_features_from_cnt(struct tfa_device *tfa, int *hw_feature_re
 }
 
 /* wrapper function */
-void get_hw_features_from_cnt(struct tfa_device *tfa, int *hw_feature_register)
+void tfa_get_hw_features_from_cnt(struct tfa_device *tfa, int *hw_feature_register)
 {
         int sw_feature_register[2];
         get_all_features_from_cnt(tfa, hw_feature_register, sw_feature_register);
 }
 
 /* wrapper function */
-void get_sw_features_from_cnt(struct tfa_device *tfa, int sw_feature_register[2])
+void tfa_get_sw_features_from_cnt(struct tfa_device *tfa, int sw_feature_register[2])
 {
         int hw_feature_register;
         get_all_features_from_cnt(tfa, &hw_feature_register, sw_feature_register);

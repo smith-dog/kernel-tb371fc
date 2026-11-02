@@ -91,6 +91,9 @@ INCS +=	$(COMMON_INC) \
 	$(TFA9894_INC)
 
 EXTRA_CFLAGS += -I$(src)/inc
+# stock parity: __FILE__ inside tfa_dsp.c resolves to the vendor audio-kernel layout
+EXTRA_CFLAGS += -fmacro-prefix-map=$(AUDIO_ROOT)/asoc/codecs/tfa98xx/src=../../vendor/qcom/opensource/audio-kernel/asoc/codecs/tfa98xx
+EXTRA_CFLAGS += -fmacro-prefix-map=techpack/audio/asoc/codecs/tfa98xx/src=../../vendor/qcom/opensource/audio-kernel/asoc/codecs/tfa98xx
 
 CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DANI_LITTLE_BIT_ENDIAN \

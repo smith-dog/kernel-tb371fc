@@ -20,7 +20,6 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/list.h>
-#include <linux/miscdevice.h>
 
 #include "tfa_device.h"
 #include "tfa_container.h"
@@ -58,20 +57,6 @@ enum tfa98xx_dsp_fw_state {
        TFA98XX_DSP_FW_PENDING,
        TFA98XX_DSP_FW_FAIL,
        TFA98XX_DSP_FW_OK,
-};
-
-enum tfa98xx_misc_device_id {
-	MISC_DEVICE_TFA98XX_REG,
-	MISC_DEVICE_TFA98XX_RW,
-	MISC_DEVICE_TFA98XX_RPC,
-	MISC_DEVICE_TFA98XX_PROFILE,
-	MISC_DEVICE_TFA98XX_IOCTL,
-	MISC_DEVICE_MAX
-};
-
-struct tfa98xx_miscdevice_info {
-	char devicename[255];
-	struct file_operations operations;
 };
 
 enum TFA_DEVICE_TYPE{
@@ -142,10 +127,11 @@ struct tfa98xx {
 	int audio_mode;
 	struct tfa98xx_firmware fw;
 	char *fw_name;
+	/* stock parity (W90-D123): SPK-ID strap raw level, stock parks it at
+	 * tfa+0x3C0 (tfa98xx_i2c_probe 0x13680) and the container-file selector
+	 * reads it back at 0x14b44. */
+	int spk_id_level;
 	int rate;
-	/*[nxp34663] CR: support 16bit/24bit/32bit audio data. begin*/
-	u8 pcm_format;
-	/*[nxp34663] CR: support 16bit/24bit/32bit audio data. end*/
 	wait_queue_head_t wq;
 	struct device *dev;
 	unsigned int init_count;
@@ -157,6 +143,12 @@ struct tfa98xx {
 	unsigned int tapdet_profiles;	/* tapdet profile bitfield */
 	bool tapdet_poll;		/* tapdet running on polling mode */
 
+	/*
+	 * stock parity (W90-D118): per-device stereo selector state word.  Stock
+	 * keeps it at tfa98xx+0x424 (i.e. list+0x64) and only the
+	 * TFA_CHIP_SELECTOR handlers touch bit 16.
+	 */
+	unsigned int stereo_flag;
 	unsigned int rate_constraint_list[TFA98XX_NUM_RATES];
 	struct snd_pcm_hw_constraint_list rate_constraint;
 
@@ -179,13 +171,6 @@ struct tfa98xx {
 	uint16_t cal_data;
 	enum TFA_DEVICE_MUTE tfa_mute_mode;
 
-	struct device_node *spk_id_gpio_p;
-
-	struct miscdevice tfa98xx_reg;
-	struct miscdevice tfa98xx_rw;
-	struct miscdevice tfa98xx_rpc;	
-	struct miscdevice tfa98xx_profile;
-	struct miscdevice tfa98xx_control;
 };
 
 

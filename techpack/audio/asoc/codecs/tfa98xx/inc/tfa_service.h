@@ -764,12 +764,12 @@ enum Tfa98xx_Error tfa_dsp_msg(struct tfa_device *tfa, int length, const char *b
  */
 enum Tfa98xx_Error dsp_msg(struct tfa_device *tfa, int length, const char *buf);
 enum Tfa98xx_Error dsp_msg_read(struct tfa_device *tfa, int length, unsigned char *bytes);
-enum Tfa98xx_Error reg_write(struct tfa_device *tfa, unsigned char subaddress, unsigned short value);
-enum Tfa98xx_Error reg_read(struct tfa_device *tfa, unsigned char subaddress, unsigned short *value);
-enum Tfa98xx_Error mem_write(struct tfa_device *tfa, unsigned short address, int value, int memtype);
-enum Tfa98xx_Error mem_read(struct tfa_device *tfa, unsigned int start_offset, int num_words, int *pValues);
+enum Tfa98xx_Error tfa_reg_write(struct tfa_device *tfa, unsigned char subaddress, unsigned short value);
+enum Tfa98xx_Error tfa_reg_read(struct tfa_device *tfa, unsigned char subaddress, unsigned short *value);
+enum Tfa98xx_Error tfa_mem_write(struct tfa_device *tfa, unsigned short address, int value, int memtype);
+enum Tfa98xx_Error tfa_mem_read(struct tfa_device *tfa, unsigned int start_offset, int num_words, int *pValues);
 
-enum Tfa98xx_Error dsp_partial_coefficients(struct tfa_device *tfa, uint8_t *prev, uint8_t *next);
+enum Tfa98xx_Error tfa_dsp_partial_coefficients(struct tfa_device *tfa, uint8_t *prev, uint8_t *next);
 
 /**
  * write/read raw msg functions:
@@ -969,7 +969,7 @@ enum Tfa98xx_Error tfa_cf_powerup(struct tfa_device *tfa);
  * print the current device manager state
  * @param tfa the device struct pointer
  */
-enum Tfa98xx_Error show_current_state(struct tfa_device *tfa);
+enum Tfa98xx_Error tfa_show_current_state(struct tfa_device *tfa);
 
 /** 
  * Init registers and coldboot dsp 
@@ -995,6 +995,10 @@ int tfa_dev_set_swvstep(struct tfa_device *tfa, unsigned short new_value);
 int tfa_needs_reset(struct tfa_device *tfa);
 
 int tfa_is_cold(struct tfa_device *tfa);
+
+/* stock parity (W90-D117): TDM bitwidth programming, stock @.text+0x6b08 */
+enum Tfa98xx_Error tfa_dev_set_tdm_bitwidth(struct tfa_device *tfa,
+					    int bitwidth);
 
 void tfa_set_query_info(struct tfa_device *tfa);
 
