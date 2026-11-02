@@ -2082,6 +2082,19 @@ noinline void kb_i2c_suspend(void)
 	printk("hid-keyboard,=== %s === start\n", __func__);
 	if (g_already_sleep)
 		return;
+	/*
+	 * TASK-091 (review-approved robustness deviation): kb_hid_suspend/
+	 * kb_hid_resume already guard on g_client; kb_i2c_suspend was the
+	 * only Spruce entry missing the guard, and an abnormal shutdown
+	 * before the kb probe completes (g_client still NULL, vendor
+	 * i2c-hid-core.c:143) dereferenced it in i2c_hid_set_power
+	 * (NULL+0xd8, panic captured by kmsg_tb371_log seq 713049).
+	 */
+	if (!g_client) {
+		printk("hid-keyboard,%s,g_client not ready, skip\n",
+		       __func__);
+		return;
+	}
 
 	ret = gpiod_direction_output_raw(gpio_to_desc(mcu_resume_gpio), 0);
 	if (ret) {
